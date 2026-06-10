@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>Reportes</h1>
+<div class="card">
+    <h2>Resumen</h2>
+    <div id="report-summary" class="grid grid-2"></div>
+</div>
+<div class="card">
+    <h2>Ventas por Dia (ultimos 30)</h2>
+    <table><thead><tr><th>Dia</th><th>Tickets</th><th>Total</th><th>Ganancia</th></tr></thead>
+    <tbody id="report-ventas-diarias"></tbody></table>
+</div>
+<div class="card">
+    <h2>Productos Mas Vendidos</h2>
+    <table><thead><tr><th>#</th><th>Producto</th><th>Vendidos</th><th>Total</th></tr></thead>
+    <tbody id="report-top-productos"></tbody></table>
+</div>
+<script>
+fetch('/api/reportes/dashboard').then(r=>r.json()).then(function(d){
+    document.getElementById('report-summary').innerHTML =
+        '<div class="card stat"><div class="value">'+d.ventas_mes+'</div><div class="label">Ventas del Mes</div></div>'+
+        '<div class="card stat"><div class="value">$'+d.ingresos_mes.toFixed(2)+'</div><div class="label">Ingresos del Mes</div></div>';
+});
+fetch('/api/reportes/ventas-diarias').then(r=>r.json()).then(function(rs){
+    var tbody = document.getElementById('report-ventas-diarias');
+    tbody.innerHTML = rs.map(function(r){ return '<tr><td>'+r.dia+'</td><td>'+r.tickets+'</td><td>$'+r.total.toFixed(2)+'</td><td>$'+r.ganancia.toFixed(2)+'</td></tr>'; }).join('');
+});
+fetch('/api/reportes/productos-mas-vendidos').then(r=>r.json()).then(function(ps){
+    var tbody = document.getElementById('report-top-productos');
+    tbody.innerHTML = ps.map(function(p,i){ return '<tr><td>'+(i+1)+'</td><td>'+p.nombre+'</td><td>'+p.vendidos+'</td><td>$'+p.total.toFixed(2)+'</td></tr>'; }).join('');
+});
+</script>
+{{end}}

@@ -1,0 +1,70 @@
+{{define "content"}}
+<div class="card" style="max-width:600px">
+    <h2>{{if .Data}}Editar Cliente{{else}}Nuevo Cliente{{end}}</h2>
+    <form id="clienteForm" onsubmit="return saveCliente(event)">
+        <input type="hidden" id="cliente_numero" value="{{if .Data}}{{.Data}}{{end}}">
+        <div class="form-group">
+            <label>Nombre</label>
+            <input type="text" id="nombre" required>
+        </div>
+        <div class="form-group">
+            <label>Direccion</label>
+            <input type="text" id="direccion">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Telefono</label>
+                <input type="text" id="telefono">
+            </div>
+            <div class="form-group">
+                <label>Limite de Credito</label>
+                <input type="number" id="limite_credito" step="0.01" min="0" value="0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Saldo Actual</label>
+                <input type="number" id="dsaldoactual" step="0.01" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Ultimo Pago</label>
+                <input type="text" id="ultimo_pago_en" placeholder="YYYY-MM-DD HH:MM:SS">
+            </div>
+        </div>
+        <div class="flex mt-1">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <a href="/clientes" class="btn btn-outline">Cancelar</a>
+        </div>
+    </form>
+</div>
+<script>
+var numEdit = document.getElementById('cliente_numero').value;
+if(numEdit){
+    fetch('/api/clientes/'+numEdit).then(r=>r.json()).then(function(c){
+        document.getElementById('nombre').value = c.nombre;
+        document.getElementById('direccion').value = c.direccion;
+        document.getElementById('telefono').value = c.telefono;
+        document.getElementById('limite_credito').value = c.limite_credito;
+        document.getElementById('dsaldoactual').value = c.dsaldoactual;
+        document.getElementById('ultimo_pago_en').value = c.ultimo_pago_en;
+    });
+}
+function saveCliente(e){
+    e.preventDefault();
+    var isEdit = !!numEdit;
+    var data = {
+        nombre: document.getElementById('nombre').value,
+        direccion: document.getElementById('direccion').value,
+        telefono: document.getElementById('telefono').value,
+        limite_credito: parseFloat(document.getElementById('limite_credito').value)||0,
+        dsaldoactual: parseFloat(document.getElementById('dsaldoactual').value)||0,
+        ultimo_pago_en: document.getElementById('ultimo_pago_en').value
+    };
+    var url = isEdit ? '/api/clientes/'+numEdit : '/api/clientes';
+    var method = isEdit ? 'PUT' : 'POST';
+    fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(function(r){ if(r.ok) window.location='/clientes'; else r.json().then(function(d){ alert('Error: '+d.error); }); });
+    return false;
+}
+</script>
+{{end}}

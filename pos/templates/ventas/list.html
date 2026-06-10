@@ -1,0 +1,22 @@
+{{define "content"}}
+<div class="flex-between mb-1">
+    <h1>Ventas</h1>
+    <a href="/ventas/pos" class="btn btn-success">+ Nueva Venta</a>
+</div>
+<div class="card">
+    <table>
+        <thead><tr><th>Folio</th><th>Fecha</th><th>Total</th><th>Ganancia</th><th>Articulos</th><th>Estado</th><th>Forma Pago</th><th></th></tr></thead>
+        <tbody id="ventas-list"></tbody>
+    </table>
+</div>
+<script>
+fetch('/api/tickets').then(r=>r.json()).then(ts=>{
+    var tbody = document.getElementById('ventas-list');
+    if(ts.length===0){ tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sin ventas</td></tr>'; return; }
+    tbody.innerHTML = ts.map(function(t){
+        var estado = t.esta_cancelado==='t' ? 'Cancelado' : (t.esta_abierto==='t' ? 'Abierto' : 'Pagado');
+        return '<tr><td><a href="/tickets/'+t.id+'">#'+(t.folio||t.id)+'</a></td><td>'+(t.creado_en||'')+'</td><td>$'+t.total.toFixed(2)+'</td><td>$'+t.ganancia.toFixed(2)+'</td><td>'+(t.numero_articulos||0)+'</td><td>'+estado+'</td><td>'+(t.forma_pago||'-')+'</td><td><a href="/tickets/'+t.id+'" class="btn btn-sm btn-outline">Ver</a></td></tr>';
+    }).join('');
+});
+</script>
+{{end}}

@@ -1,0 +1,34 @@
+{{define "content"}}
+<div class="flex-between mb-1">
+    <h1>Productos</h1>
+    <a href="/productos/nuevo" class="btn btn-primary">+ Nuevo Producto</a>
+</div>
+<div class="card">
+    <div class="search-box">
+        <input type="text" id="searchProducto" placeholder="Buscar por codigo o descripcion..." oninput="filterProductos(this.value)">
+        <button class="btn btn-outline" onclick="document.getElementById('searchProducto').value='';filterProductos('')">Limpiar</button>
+    </div>
+    <table>
+        <thead><tr><th>Codigo</th><th>Descripcion</th><th>P. Costo</th><th>P. Venta</th><th>Stock</th><th>Min</th><th>Acciones</th></tr></thead>
+        <tbody id="productos-list"></tbody>
+    </table>
+</div>
+<script>
+var allProductos = [];
+fetch('/api/productos').then(r=>r.json()).then(ps=>{ allProductos=ps; renderProductos(ps); });
+function renderProductos(ps){
+    var tbody = document.getElementById('productos-list');
+    if(ps.length===0){ tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sin productos</td></tr>'; return; }
+    tbody.innerHTML = ps.map(function(p){ return '<tr>'+
+        '<td>'+p.codigo+'</td><td>'+p.descripcion+'</td><td>$'+p.pcosto.toFixed(2)+
+        '</td><td>$'+p.pventa.toFixed(2)+'</td><td>'+p.dinventario+'</td><td>'+p.dinvminimo+'</td>'+
+        '<td><a href="/productos/'+encodeURIComponent(p.codigo)+'/editar" class="btn btn-sm btn-outline">Editar</a></td></tr>';
+    }).join('');
+}
+function filterProductos(q){
+    if(!q) return renderProductos(allProductos);
+    q = q.toLowerCase();
+    renderProductos(allProductos.filter(function(p){ return p.codigo.toLowerCase().includes(q) || (p.descripcion||'').toLowerCase().includes(q); }));
+}
+</script>
+{{end}}

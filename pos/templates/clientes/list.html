@@ -1,0 +1,29 @@
+{{define "content"}}
+<div class="flex-between mb-1">
+    <h1>Clientes</h1>
+    <a href="/clientes/nuevo" class="btn btn-primary">+ Nuevo Cliente</a>
+</div>
+<div class="card">
+    <div class="search-box">
+        <input type="text" id="searchCliente" placeholder="Buscar cliente..." oninput="filtrarClientes(this.value)">
+    </div>
+    <table>
+        <thead><tr><th>#</th><th>Nombre</th><th>Telefono</th><th>Saldo</th><th>Limite Credito</th><th>Acciones</th></tr></thead>
+        <tbody id="clientes-list"></tbody>
+    </table>
+</div>
+<script>
+var allClientes = [];
+fetch('/api/clientes').then(r=>r.json()).then(cs=>{ allClientes=cs; renderClientes(cs); });
+function renderClientes(cs){
+    var tbody = document.getElementById('clientes-list');
+    if(cs.length===0){ tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin clientes</td></tr>'; return; }
+    tbody.innerHTML = cs.map(function(c){ return '<tr><td>'+c.numero+'</td><td>'+c.nombre+'</td><td>'+c.telefono+'</td><td>$'+c.dsaldoactual.toFixed(2)+'</td><td>$'+c.limite_credito.toFixed(2)+'</td><td><a href="/clientes/'+c.numero+'/editar" class="btn btn-sm btn-outline">Editar</a></td></tr>'; }).join('');
+}
+function filtrarClientes(q){
+    if(!q) return renderClientes(allClientes);
+    q = q.toLowerCase();
+    renderClientes(allClientes.filter(function(c){ return (c.nombre||'').toLowerCase().includes(q) || (c.telefono||'').includes(q); }));
+}
+</script>
+{{end}}

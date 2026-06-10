@@ -1,0 +1,19 @@
+{{define "content"}}
+<div class="flex-between mb-1"><h1>Tickets</h1></div>
+<div class="card">
+    <table>
+        <thead><tr><th>#</th><th>Folio</th><th>Fecha</th><th>Total</th><th>Articulos</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tickets-list"></tbody>
+    </table>
+</div>
+<script>
+fetch('/api/tickets').then(r=>r.json()).then(ts=>{
+    var tbody = document.getElementById('tickets-list');
+    if(ts.length===0){ tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sin tickets</td></tr>'; return; }
+    tbody.innerHTML = ts.map(function(t){
+        var estado = t.esta_cancelado==='t' ? 'Cancelado' : (t.esta_abierto==='t' ? 'Abierto' : 'Pagado');
+        return '<tr><td>'+t.id+'</td><td>'+(t.folio||'-')+'</td><td>'+(t.creado_en||'')+'</td><td>$'+t.total.toFixed(2)+'</td><td>'+(t.numero_articulos||0)+'</td><td>'+estado+'</td><td><a href="/tickets/'+t.id+'" class="btn btn-sm btn-outline">Ver</a></td></tr>';
+    }).join('');
+});
+</script>
+{{end}}

@@ -1,0 +1,49 @@
+name: Build Abarrotes PDV
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'pos/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: pos/go.sum
+
+      - name: Generate go.sum
+        run: go mod tidy
+
+      - name: Build for linux/amd64
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o abarrotes-pdv .
+
+      - name: Build for windows/amd64
+        run: |
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o abarrotes-pdv.exe .
+
+      - name: Upload Linux binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: abarrotes-pdv-linux
+          path: pos/abarrotes-pdv
+          if-no-files-found: error
+
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: abarrotes-pdv-windows
+          path: pos/abarrotes-pdv.exe
+          if-no-files-found: error

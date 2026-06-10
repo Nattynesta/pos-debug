@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="card" style="max-width:700px">
+    <div class="flex-between mb-1">
+        <h2>Ticket #<span id="td-folio"></span></h2>
+        <div><span class="btn btn-sm" id="td-estado"></span></div>
+    </div>
+    <div class="text-muted mb-1" id="td-fecha"></div>
+    <table>
+        <thead><tr><th>Producto</th><th>Cant</th><th>Precio</th><th>Total</th></tr></thead>
+        <tbody id="td-articulos"></tbody>
+        <tfoot><tr><td colspan="3" class="text-right"><strong>Subtotal</strong></td><td id="td-subtotal"></td></tr>
+        <tr><td colspan="3" class="text-right"><strong>Total</strong></td><td id="td-total"></td></tr>
+        <tr><td colspan="3" class="text-right"><strong>Pago con</strong></td><td id="td-pago"></td></tr>
+        <tr><td colspan="3" class="text-right"><strong>Cambio</strong></td><td id="td-cambio"></td></tr></tfoot>
+    </table>
+    <div class="flex mt-1">
+        <a href="/tickets" class="btn btn-outline">Volver</a>
+    </div>
+</div>
+<script>
+var ticketId = '{{.Data}}';
+fetch('/api/tickets/'+ticketId).then(r=>r.json()).then(function(t){
+    document.getElementById('td-folio').textContent = t.folio || t.id;
+    document.getElementById('td-fecha').textContent = t.creado_en;
+    var estado = document.getElementById('td-estado');
+    if(t.esta_cancelado==='t'){ estado.textContent='Cancelado'; estado.className='btn btn-sm btn-danger'; }
+    else if(t.esta_abierto==='t'){ estado.textContent='Abierto'; estado.className='btn btn-sm btn-warning'; }
+    else { estado.textContent='Pagado'; estado.className='btn btn-sm btn-success'; }
+    document.getElementById('td-subtotal').textContent = '$'+t.subtotal.toFixed(2);
+    document.getElementById('td-total').textContent = '$'+t.total.toFixed(2);
+    document.getElementById('td-pago').textContent = '$'+(t.pago_con||0).toFixed(2);
+    document.getElementById('td-cambio').textContent = '$'+(t.total_devuelto||0).toFixed(2);
+    var tbody = document.getElementById('td-articulos');
+    if(t.articulos && t.articulos.length){
+        tbody.innerHTML = t.articulos.map(function(a){
+            return '<tr><td>'+a.producto_nombre+'</td><td>'+a.cantidad+'</td><td>$'+a.precio_usado.toFixed(2)+'</td><td>$'+(a.cantidad*a.precio_usado).toFixed(2)+'</td></tr>';
+        }).join('');
+    }
+});
+</script>
+{{end}}

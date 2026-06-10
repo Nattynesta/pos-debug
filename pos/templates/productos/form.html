@@ -1,0 +1,135 @@
+{{define "content"}}
+<div class="card" style="max-width:700px">
+    <h2>{{if .Data}}Editar Producto{{else}}Nuevo Producto{{end}}</h2>
+    <form id="productoForm" onsubmit="return saveProducto(event)">
+        <input type="hidden" id="codigo_original" value="{{if .Data}}{{.Data}}{{end}}">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Codigo (codigo de barras)</label>
+                <input type="text" id="codigo" required {{if .Data}}readonly{{end}}>
+            </div>
+            <div class="form-group">
+                <label>Descripcion</label>
+                <input type="text" id="descripcion" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Tipo de Venta</label>
+                <select id="tventa"><option value="U">Unidad</option><option value="P">Peso</option><option value="M">Medida</option></select>
+            </div>
+            <div class="form-group">
+                <label>Departamento</label>
+                <select id="dept"><option value="">Sin departamento</option></select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Precio de Costo</label>
+                <input type="number" id="pcosto" step="0.01" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Precio de Venta</label>
+                <input type="number" id="pventa" step="0.01" min="0" value="0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Mayoreo</label>
+                <input type="number" id="mayoreo" step="0.01" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Unidad de Medida</label>
+                <select id="umedida"><option value="">Sin medida</option></select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Proveedor</label>
+                <select id="provid"><option value="">Sin proveedor</option></select>
+            </div>
+            <div class="form-group">
+                <label>% Ganancia</label>
+                <input type="number" id="porcentaje_ganancia" min="0" value="0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Stock Actual</label>
+                <input type="number" id="dinventario" step="0.01" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Stock Minimo</label>
+                <input type="number" id="dinvminimo" step="0.01" min="0" value="0">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Impuestos (ids separados por coma)</label>
+            <input type="text" id="impuestos" placeholder="1,2,3">
+        </div>
+        <div class="flex mt-1">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <a href="/productos" class="btn btn-outline">Cancelar</a>
+        </div>
+    </form>
+</div>
+<script>
+fetch('/api/departamentos').then(r=>r.json()).then(ds=>{
+    var sel = document.getElementById('dept');
+    ds.forEach(function(d){ var o = document.createElement('option'); o.value=d.id; o.textContent=d.nombre; sel.appendChild(o); });
+});
+fetch('/api/medidas').then(r=>r.json()).then(ms=>{
+    var sel = document.getElementById('umedida');
+    ms.forEach(function(m){ var o = document.createElement('option'); o.value=m.codigo; o.textContent=m.nombre; sel.appendChild(o); });
+});
+fetch('/api/proveedores').then(r=>r.json()).then(ps=>{
+    var sel = document.getElementById('provid');
+    ps.forEach(function(p){ var o = document.createElement('option'); o.value=p.num; o.textContent=p.nombre; sel.appendChild(o); });
+});
+
+var codigoEdit = document.getElementById('codigo_original').value;
+if(codigoEdit){
+    fetch('/api/productos/'+encodeURIComponent(codigoEdit)).then(r=>r.json()).then(function(p){
+        document.getElementById('codigo').value = p.codigo;
+        document.getElementById('descripcion').value = p.descripcion;
+        document.getElementById('tventa').value = p.tventa;
+        document.getElementById('pcosto').value = p.pcosto;
+        document.getElementById('pventa').value = p.pventa;
+        document.getElementById('mayoreo').value = p.mayoreo;
+        document.getElementById('porcentaje_ganancia').value = p.porcentaje_ganancia;
+        document.getElementById('dinventario').value = p.dinventario;
+        document.getElementById('dinvminimo').value = p.dinvminimo;
+        if(p.dept) document.getElementById('dept').value = p.dept;
+        if(p.umedida) document.getElementById('umedida').value = p.umedida;
+        if(p.provid) document.getElementById('provid').value = p.provid;
+        document.getElementById('impuestos').value = p.impuestos;
+    });
+}
+
+function saveProducto(e){
+    e.preventDefault();
+    var codigo = document.getElementById('codigo').value;
+    var isEdit = !!document.getElementById('codigo_original').value;
+    var data = {
+        codigo: codigo,
+        descripcion: document.getElementById('descripcion').value,
+        tventa: document.getElementById('tventa').value,
+        pcosto: parseFloat(document.getElementById('pcosto').value)||0,
+        pventa: parseFloat(document.getElementById('pventa').value)||0,
+        dept: parseInt(document.getElementById('dept').value)||null,
+        provid: parseInt(document.getElementById('provid').value)||null,
+        umedida: parseInt(document.getElementById('umedida').value)||null,
+        mayoreo: parseFloat(document.getElementById('mayoreo').value)||0,
+        porcentaje_ganancia: parseInt(document.getElementById('porcentaje_ganancia').value)||0,
+        dinventario: parseFloat(document.getElementById('dinventario').value)||0,
+        dinvminimo: parseFloat(document.getElementById('dinvminimo').value)||0,
+        impuestos: document.getElementById('impuestos').value
+    };
+    var url = isEdit ? '/api/productos/'+encodeURIComponent(codigoEdit) : '/api/productos';
+    var method = isEdit ? 'PUT' : 'POST';
+    fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(function(r){ if(r.ok) window.location='/productos'; else r.json().then(function(d){ alert('Error: '+d.error); }); });
+    return false;
+}
+</script>
+{{end}}

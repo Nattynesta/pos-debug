@@ -1,0 +1,4 @@
+pos/abarrotes-pdv*
+pos/.env
+*.db
+*.exe

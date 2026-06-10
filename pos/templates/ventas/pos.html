@@ -1,0 +1,160 @@
+{{define "content"}}
+<div style="display:grid; grid-template-columns: 1fr 380px; gap:1rem; min-height: calc(100vh - 8rem);">
+    <div class="card" style="margin-bottom:0">
+        <h2>Nueva Venta</h2>
+        <div class="search-box" style="margin-top:.5rem">
+            <input type="text" id="barcode" placeholder="Codigo de barras o nombre..." autofocus onkeydown="if(event.key==='Enter')buscarYAgregar()">
+            <button class="btn btn-primary" onclick="buscarYAgregar()">Agregar</button>
+        </div>
+        <div style="overflow-y:auto; max-height:60vh">
+            <table>
+                <thead><tr><th>Codigo</th><th>Producto</th><th>Cant</th><th>Precio</th><th>Total</th><th></th></tr></thead>
+                <tbody id="carrito-items">
+                    <tr><td colspan="6" class="text-center text-muted">Escanea un producto para comenzar</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card" style="margin-bottom:0; display:flex; flex-direction:column">
+        <h2>Resumen</h2>
+        <div id="ticket-info" style="flex:1">
+            <div class="stat"><div class="label">Subtotal</div><div class="value" id="res-subtotal">$0.00</div></div>
+            <div class="stat"><div class="label">Total</div><div class="value" id="res-total" style="font-size:2.2rem">$0.00</div></div>
+            <div class="stat"><div class="label">Articulos</div><div class="value" id="res-articulos">0</div></div>
+        </div>
+        <div style="margin-top:auto">
+            <div class="form-group">
+                <label>Forma de pago</label>
+                <select id="formaPago" style="margin-bottom:.5rem">
+                    <option value="e">Efectivo</option>
+                    <option value="t">Tarjeta</option>
+                    <option value="v">Vales</option>
+                </select>
+                <input type="number" id="pagoCon" step="0.01" min="0" placeholder="Monto recibido...">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem">
+                <button class="btn btn-success" style="font-size:1.1rem; padding:.75rem" onclick="cobrar()">Cobrar</button>
+                <button class="btn btn-danger" onclick="cancelarTicket()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+var currentTicket = null;
+var articulos = [];
+
+function iniciarVenta(){
+    fetch('/api/tickets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({caja_id:1, cajero_id:1})})
+    .then(function(r){ return r.json(); }).then(function(t){ currentTicket = t.id; articulos=[]; actualizarCarrito(); })
+    .catch(function(){ alert('Error: No hay caja abierta. Abre la caja primero.'); window.location='/cajas'; });
+}
+
+function buscarYAgregar(){
+    var q = document.getElementById('barcode').value.trim();
+    if(!q) return;
+    fetch('/api/productos/'+encodeURIComponent(q)).then(function(r){
+        if(!r.ok){ fetch('/api/productos?q='+encodeURIComponent(q)).then(function(r2){ return r2.json(); }).then(function(ps){
+            if(ps.length>0) agregarAlCarrito(ps[0]); else alert('Producto no encontrado');
+        }); return; }
+        return r.json();
+    }).then(function(p){
+        if(p && p.codigo) agregarAlCarrito(p);
+        document.getElementById('barcode').value='';
+        document.getElementById('barcode').focus();
+    });
+}
+
+function agregarAlCarrito(p){
+    if(!currentTicket){ iniciarVenta(); setTimeout(function(){ agregarAlCarrito(p); }, 500); return; }
+    var existente = articulos.find(function(a){ return a.producto_codigo === p.codigo; });
+    if(existente){
+        existente.cantidad += 1;
+        actualizarCarrito();
+        return;
+    }
+    articulos.push({
+        producto_codigo: p.codigo,
+        producto_nombre: p.descripcion,
+        cantidad: 1,
+        precio_usado: p.pventa,
+        ganancia: p.pventa - p.pcosto
+    });
+    actualizarCarrito();
+}
+
+function actualizarCarrito(){
+    var tbody = document.getElementById('carrito-items');
+    if(articulos.length===0){
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Escanea un producto para comenzar</td></tr>';
+    } else {
+        tbody.innerHTML = articulos.map(function(a,i){
+            var total = a.cantidad * a.precio_usado;
+            return '<tr><td>'+a.producto_codigo+'</td><td>'+a.producto_nombre+'</td>'+
+                '<td><button class="btn btn-sm btn-outline" onclick="cambiarCantidad('+i+',-1)">-</button> '+a.cantidad+' <button class="btn btn-sm btn-outline" onclick="cambiarCantidad('+i+',1)">+</button></td>'+
+                '<td>$'+a.precio_usado.toFixed(2)+'</td><td>$'+total.toFixed(2)+'</td>'+
+                '<td><button class="btn btn-sm btn-danger" onclick="eliminarArticulo('+i+')">X</button></td></tr>';
+        }).join('');
+    }
+    var subtotal = articulos.reduce(function(s,a){ return s + a.cantidad * a.precio_usado; }, 0);
+    var total = subtotal;
+    var numArts = articulos.reduce(function(s,a){ return s + a.cantidad; }, 0);
+    document.getElementById('res-subtotal').textContent = '$'+subtotal.toFixed(2);
+    document.getElementById('res-total').textContent = '$'+total.toFixed(2);
+    document.getElementById('res-articulos').textContent = numArts;
+}
+
+function cambiarCantidad(idx, delta){
+    if(!articulos[idx]) return;
+    articulos[idx].cantidad = Math.max(0.5, articulos[idx].cantidad + delta);
+    actualizarCarrito();
+}
+
+function eliminarArticulo(idx){
+    articulos.splice(idx, 1);
+    if(articulos.length===0 && currentTicket){
+        fetch('/api/tickets/'+currentTicket+'/cancelar', {method:'POST'});
+        currentTicket = null;
+    }
+    actualizarCarrito();
+}
+
+function cobrar(){
+    if(!currentTicket || articulos.length===0){ alert('Carrito vacio'); return; }
+    var pagoCon = parseFloat(document.getElementById('pagoCon').value);
+    var formaPago = document.getElementById('formaPago').value;
+    var total = articulos.reduce(function(s,a){ return s + a.cantidad * a.precio_usado; }, 0);
+    if(!pagoCon || pagoCon < total){ alert('El monto recibido es insuficiente. Total: $'+total.toFixed(2)); return; }
+
+    // Primero guardar articulos
+    var promises = articulos.map(function(a){
+        return fetch('/api/tickets/'+currentTicket+'/articulo', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({producto_codigo: a.producto_codigo, cantidad: a.cantidad})});
+    });
+    Promise.all(promises).then(function(){
+        fetch('/api/tickets/'+currentTicket+'/cobrar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pago_con: pagoCon, forma_pago: formaPago})})
+        .then(function(r){ return r.json(); }).then(function(res){
+            if(res.cambio && parseFloat(res.cambio) > 0){
+                alert('Cambio: $'+parseFloat(res.cambio).toFixed(2));
+            }
+            currentTicket = null;
+            articulos = [];
+            actualizarCarrito();
+            document.getElementById('pagoCon').value = '';
+            document.getElementById('barcode').focus();
+        });
+    });
+}
+
+function cancelarTicket(){
+    if(currentTicket){
+        if(!confirm('Cancelar esta venta?')) return;
+        fetch('/api/tickets/'+currentTicket+'/cancelar', {method:'POST'});
+    }
+    currentTicket = null;
+    articulos = [];
+    actualizarCarrito();
+    document.getElementById('barcode').focus();
+}
+
+iniciarVenta();
+</script>
+{{end}}

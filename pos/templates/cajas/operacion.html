@@ -1,0 +1,70 @@
+{{define "content"}}
+<h1>Caja</h1>
+<div id="caja-status"></div>
+<div id="caja-actions"></div>
+
+<script>
+function checkCaja(){
+    fetch('/api/operaciones/activa').then(r=>r.json()).then(function(res){
+        var status = document.getElementById('caja-status');
+        var actions = document.getElementById('caja-actions');
+        if(res.activa){
+            var o = res.operacion;
+            status.innerHTML = '<div class="card"><div class="grid grid-4">'+
+                '<div class="stat"><div class="value">$'+o.ventas.toFixed(2)+'</div><div class="label">Ventas</div></div>'+
+                '<div class="stat"><div class="value">$'+o.ganancias.toFixed(2)+'</div><div class="label">Ganancias</div></div>'+
+                '<div class="stat"><div class="value">$'+o.ingresos_efectivo.toFixed(2)+'</div><div class="label">Efectivo</div></div>'+
+                '<div class="stat"><div class="value">$'+o.entradas.toFixed(2)+'</div><div class="label">Entradas</div></div>'+
+                '<div class="stat"><div class="value">$'+o.salidas.toFixed(2)+'</div><div class="label">Salidas</div></div>'+
+                '</div></div>';
+            actions.innerHTML = '<div class="card"><h2>Movimientos</h2>'+
+                '<form onsubmit="return registrarMovimiento(event)" class="form-row" style="align-items:end">'+
+                '<div class="form-group"><label>Tipo</label><select id="movTipo"><option value="E">Entrada</option><option value="S">Salida</option></select></div>'+
+                '<div class="form-group"><label>Monto</label><input type="number" id="movMonto" step="0.01" min="0" required></div>'+
+                '<div class="form-group"><label>Comentario</label><input type="text" id="movComent"></div>'+
+                '<div><button type="submit" class="btn btn-primary">Registrar</button></div>'+
+                '</form></div>'+
+                '<div class="card"><button class="btn btn-danger" onclick="cerrarCaja('+o.id+')">Cerrar Caja</button></div>'+
+                '<div class="card" style="margin-top:1rem"><a href="/ventas/pos" class="btn btn-success" style="font-size:1.1rem;padding:.75rem 2rem">Ir a Vender</a></div>';
+        } else {
+            status.innerHTML = '<div class="card"><h2>Caja Cerrada</h2><p class="text-muted">Abre la caja para comenzar a operar</p></div>';
+            actions.innerHTML = '<div class="card"><h2>Abrir Caja</h2>'+
+                '<form onsubmit="return abrirCaja(event)">'+
+                '<div class="form-group"><label>Monto inicial en caja</label><input type="number" id="dineroInicial" step="0.01" min="0" value="500" required></div>'+
+                '<button type="submit" class="btn btn-success">Abrir Caja</button></form></div>';
+        }
+    });
+}
+
+function abrirCaja(e){
+    e.preventDefault();
+    var dinero = parseFloat(document.getElementById('dineroInicial').value)||0;
+    fetch('/api/operaciones/abrir', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({caja_id:1, usuario_id:1, dinero_en_caja:dinero})})
+    .then(function(r){ if(r.ok) checkCaja(); else r.json().then(function(d){ alert('Error: '+d.error); }); });
+    return false;
+}
+
+function cerrarCaja(id){
+    if(!confirm('Cerrar la caja? Se registraran los totales actuales.')) return;
+    fetch('/api/operaciones/cerrar/'+id, {method:'POST'}).then(function(){ checkCaja(); });
+}
+
+function registrarMovimiento(e){
+    e.preventDefault();
+    fetch('/api/operaciones/activa').then(function(r){ return r.json(); }).then(function(res){
+        if(!res.activa){ alert('No hay caja abierta'); return; }
+        fetch('/api/movimientos', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+            operacion_id: res.operacion.id,
+            monto: parseFloat(document.getElementById('movMonto').value)||0,
+            comentarios: document.getElementById('movComent').value,
+            tipo: document.getElementById('movTipo').value,
+            caja_id: 1,
+            cajero_id: 1
+        })}).then(function(r){ if(r.ok){ document.getElementById('movMonto').value=''; document.getElementById('movComent').value=''; checkCaja(); } });
+    });
+    return false;
+}
+
+checkCaja();
+</script>
+{{end}}

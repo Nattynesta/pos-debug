@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -167,10 +168,12 @@ func main() {
 }
 
 func migrate(db *sql.DB) error {
-	statements := strings.Split(schemaSQL, ";")
+	clean := regexp.MustCompile(`(?m)^\s*--.*$`).ReplaceAllString(schemaSQL, "")
+	clean = regexp.MustCompile(`/\*.*?\*/`).ReplaceAllString(clean, "")
+	statements := strings.Split(clean, ";")
 	for _, stmt := range statements {
 		stmt = strings.TrimSpace(stmt)
-		if stmt == "" || strings.HasPrefix(stmt, "--") {
+		if stmt == "" {
 			continue
 		}
 		if _, err := db.Exec(stmt); err != nil {

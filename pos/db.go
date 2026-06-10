@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 type Producto struct {

@@ -1,161 +1,229 @@
 {{template "base.html" .}}
 {{define "content"}}
-<div style="display:grid; grid-template-columns: 1fr 380px; gap:1rem; min-height: calc(100vh - 8rem);">
-    <div class="card" style="margin-bottom:0">
-        <h2>Nueva Venta</h2>
-        <div class="search-box" style="margin-top:.5rem">
-            <input type="text" id="barcode" placeholder="Codigo de barras o nombre..." autofocus onkeydown="if(event.key==='Enter')buscarYAgregar()">
-            <button class="btn btn-primary" onclick="buscarYAgregar()">Agregar</button>
-        </div>
-        <div style="overflow-y:auto; max-height:60vh">
-            <table>
-                <thead><tr><th>Codigo</th><th>Producto</th><th>Cant</th><th>Precio</th><th>Total</th><th></th></tr></thead>
-                <tbody id="carrito-items">
-                    <tr><td colspan="6" class="text-center text-muted">Escanea un producto para comenzar</td></tr>
-                </tbody>
-            </table>
-        </div>
+<style>
+.pos-layout { display:flex; gap:1rem; min-height:calc(100vh - 8rem); }
+.pos-products { flex:1; }
+.cart-panel { width:380px; background:white; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.1); display:flex; flex-direction:column; position:sticky; top:5rem; height:calc(100vh - 8rem); }
+.cart-header { padding:.75rem 1rem; border-bottom:1px solid #e5e7eb; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+.cart-items { flex:1; overflow-y:auto; padding:.5rem; }
+.cart-footer { padding:.75rem 1rem; border-top:1px solid #e5e7eb; }
+.search-pos { margin-bottom:.75rem; }
+.dept-chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.dept-chip { padding:.3rem .7rem; border-radius:999px; font-size:.75rem; border:1px solid #d1d5db; background:white; cursor:pointer; white-space:nowrap; }
+.dept-chip.active { background:#1e3a5f; color:white; border-color:#1e3a5f; }
+.product-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.5rem; }
+.product-card { background:white; border-radius:10px; padding:.75rem; box-shadow:0 1px 3px rgba(0,0,0,.08); cursor:pointer; transition:transform .1s,box-shadow .1s; display:flex; flex-direction:column; align-items:center; text-align:center; border:2px solid transparent; user-select:none; -webkit-tap-highlight-color:transparent; }
+.product-card:active { transform:scale(.96); box-shadow:0 1px 1px rgba(0,0,0,.05); }
+.product-card .avatar { width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.3rem; font-weight:700; color:white; margin-bottom:.4rem; flex-shrink:0; }
+.product-card .pname { font-size:.8rem; font-weight:500; line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:.25rem; word-break:break-word; }
+.product-card .pprice { font-size:.95rem; font-weight:700; color:#059669; }
+.product-card .pstock { font-size:.65rem; color:#9ca3af; }
+.cart-item { display:flex; align-items:center; gap:.5rem; padding:.5rem; border-bottom:1px solid #f3f4f6; }
+.cart-item .ci-info { flex:1; min-width:0; }
+.cart-item .ci-name { font-size:.8rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cart-item .ci-price { font-size:.75rem; color:#6b7280; }
+.cart-item .ci-qty { display:flex; align-items:center; gap:.3rem; }
+.cart-item .ci-qty button { width:28px; height:28px; border-radius:50%; border:1px solid #d1d5db; background:white; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.cart-item .ci-qty span { min-width:20px; text-align:center; font-weight:600; font-size:.85rem; }
+.cart-item .ci-remove { color:#dc2626; cursor:pointer; font-size:1.1rem; padding:.25rem; }
+.cart-total-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem; }
+.cart-total-row .label { font-size:.85rem; color:#6b7280; }
+.cart-total-row .total { font-size:1.5rem; font-weight:700; }
+.cart-pago { display:flex; gap:.4rem; margin-bottom:.5rem; }
+.cart-pago select, .cart-pago input { flex:1; }
+.cart-fab { display:none; position:fixed; bottom:1.5rem; right:1.5rem; width:56px; height:56px; border-radius:50%; background:#1e3a5f; color:white; border:none; font-size:1.3rem; box-shadow:0 4px 12px rgba(0,0,0,.3); cursor:pointer; z-index:100; }
+.cart-fab .badge { position:absolute; top:-4px; right:-4px; background:#ef4444; color:white; border-radius:50%; width:22px; height:22px; font-size:.7rem; display:flex; align-items:center; justify-content:center; font-weight:700; }
+@media(max-width:768px){
+  .pos-layout { flex-direction:column; }
+  .cart-panel { display:none; position:fixed; inset:0; z-index:99; width:100%; height:100%; border-radius:0; top:auto; max-height:85vh; border-radius:16px 16px 0 0; }
+  .cart-panel.open { display:flex; }
+  .cart-fab { display:flex; }
+  .product-grid { grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:.4rem; }
+  .product-card { padding:.5rem; }
+  .product-card .avatar { width:40px; height:40px; font-size:1.1rem; }
+  .product-card .pname { font-size:.75rem; }
+  .product-card .pprice { font-size:.85rem; }
+}
+.cart-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:98; }
+.cart-overlay.open { display:block; }
+.empty-grid { text-align:center; color:#9ca3af; padding:3rem 1rem; grid-column:1/-1; }
+.btn-block { width:100%; }
+</style>
+
+<div class="pos-layout">
+  <div class="pos-products">
+    <div class="search-pos">
+      <input type="text" id="search" placeholder="Buscar producto..." oninput="searchProductos(this.value)">
     </div>
-    <div class="card" style="margin-bottom:0; display:flex; flex-direction:column">
-        <h2>Resumen</h2>
-        <div id="ticket-info" style="flex:1">
-            <div class="stat"><div class="label">Subtotal</div><div class="value" id="res-subtotal">$0.00</div></div>
-            <div class="stat"><div class="label">Total</div><div class="value" id="res-total" style="font-size:2.2rem">$0.00</div></div>
-            <div class="stat"><div class="label">Articulos</div><div class="value" id="res-articulos">0</div></div>
-        </div>
-        <div style="margin-top:auto">
-            <div class="form-group">
-                <label>Forma de pago</label>
-                <select id="formaPago" style="margin-bottom:.5rem">
-                    <option value="e">Efectivo</option>
-                    <option value="t">Tarjeta</option>
-                    <option value="v">Vales</option>
-                </select>
-                <input type="number" id="pagoCon" step="0.01" min="0" placeholder="Monto recibido...">
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem">
-                <button class="btn btn-success" style="font-size:1.1rem; padding:.75rem" onclick="cobrar()">Cobrar</button>
-                <button class="btn btn-danger" onclick="cancelarTicket()">Cancelar</button>
-            </div>
-        </div>
+    <div class="dept-chips" id="dept-chips"></div>
+    <div class="product-grid" id="product-grid"><div class="empty-grid">Cargando productos...</div></div>
+  </div>
+  <div class="cart-overlay" id="cart-overlay" onclick="toggleCart()"></div>
+  <div class="cart-panel" id="cart-panel">
+    <div class="cart-header">
+      <span>Carrito (<span id="cart-count">0</span>)</span>
+      <button class="btn btn-sm btn-outline" onclick="toggleCart()">Cerrar</button>
     </div>
+    <div class="cart-items" id="cart-items">
+      <div class="empty-grid">Agrega productos para comenzar</div>
+    </div>
+    <div class="cart-footer">
+      <div class="cart-total-row">
+        <span class="label">Total</span>
+        <span class="total" id="cart-total">$0.00</span>
+      </div>
+      <div class="cart-pago">
+        <select id="formaPago">
+          <option value="e">Efectivo</option>
+          <option value="t">Tarjeta</option>
+          <option value="v">Vales</option>
+        </select>
+        <input type="number" id="pagoCon" step="0.01" min="0" placeholder="$ recibido">
+      </div>
+      <button class="btn btn-success btn-block" style="font-size:1rem;padding:.7rem" onclick="cobrar()">Cobrar</button>
+      <button class="btn btn-outline btn-block" style="margin-top:.3rem;font-size:.8rem" onclick="cancelarTicket()">Cancelar venta</button>
+    </div>
+  </div>
 </div>
+
+<button class="cart-fab" id="cart-fab" onclick="toggleCart()">
+  🛒<span class="badge" id="fab-count">0</span>
+</button>
+
 <script>
-var currentTicket = null;
-var articulos = [];
+var allProductos = [], departamentos = [], currentTicket = null, articulos = [], deptColors = {};
+
+var COLORS = ['#1e3a5f','#059669','#d97706','#dc2626','#7c3aed','#0891b2','#be123c','#15803d','#b45309','#1d4ed8','#9333ea','#0d9488','#c2410c','#2563eb','#db2777','#65a30d'];
+
+fetch('/api/departamentos').then(function(r){return r.json()}).then(function(ds){
+  departamentos = ds;
+  ds.forEach(function(d,i){ deptColors[d.id] = COLORS[i % COLORS.length]; });
+  var html = '<span class="dept-chip active" data-id="" onclick="filtrarDept(this)">Todos</span>';
+  ds.forEach(function(d){ if(d.activo==='t') html += '<span class="dept-chip" data-id="'+d.id+'" onclick="filtrarDept(this)">'+d.nombre+'</span>'; });
+  document.getElementById('dept-chips').innerHTML = html;
+});
+
+fetch('/api/productos').then(function(r){return r.json()}).then(function(ps){
+  allProductos = ps;
+  renderProductos(ps);
+});
+
+function renderProductos(lista){
+  var grid = document.getElementById('product-grid');
+  if(!lista.length){ grid.innerHTML = '<div class="empty-grid">Sin productos</div>'; return; }
+  grid.innerHTML = lista.map(function(p){
+    var color = deptColors[p.dept] || '#6b7280';
+    var letter = (p.descripcion||p.codigo).charAt(0).toUpperCase();
+    return '<div class="product-card" onclick="agregarAlCarrito(\''+p.codigo+'\')">'+
+      '<div class="avatar" style="background:'+color+'">'+letter+'</div>'+
+      '<div class="pname">'+(p.descripcion||p.codigo)+'</div>'+
+      '<div class="pprice">$'+p.pventa.toFixed(2)+'</div>'+
+      (p.dinventario<=5 && p.dinventario>0 ? '<div class="pstock">Stock: '+p.dinventario+'</div>' : '')+
+      (p.dinventario<=0 ? '<div class="pstock" style="color:#dc2626">Sin stock</div>' : '')+
+    '</div>';
+  }).join('');
+}
+
+var searchTimeout;
+function searchProductos(q){
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(function(){
+    q = q.toLowerCase().trim();
+    var filtered = q ? allProductos.filter(function(p){ return (p.descripcion||'').toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q); }) : allProductos;
+    renderProductos(filtered);
+  }, 150);
+}
+
+var deptActivo = '';
+function filtrarDept(el){
+  document.querySelectorAll('.dept-chip').forEach(function(c){ c.classList.remove('active'); });
+  el.classList.add('active');
+  deptActivo = el.dataset.id;
+  aplicarFiltros();
+}
+
+function aplicarFiltros(){
+  var q = document.getElementById('search').value.toLowerCase().trim();
+  var lista = allProductos;
+  if(deptActivo) lista = lista.filter(function(p){ return p.dept == deptActivo; });
+  if(q) lista = lista.filter(function(p){ return (p.descripcion||'').toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q); });
+  renderProductos(lista);
+}
 
 function iniciarVenta(){
-    fetch('/api/tickets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({caja_id:1, cajero_id:1})})
-    .then(function(r){ return r.json(); }).then(function(t){ currentTicket = t.id; articulos=[]; actualizarCarrito(); })
-    .catch(function(){ alert('Error: No hay caja abierta. Abre la caja primero.'); window.location='/cajas'; });
+  fetch('/api/tickets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({caja_id:1, cajero_id:1})})
+  .then(function(r){ return r.json(); }).then(function(t){ currentTicket = t.id; articulos=[]; actualizarCarrito(); })
+  .catch(function(){ alert('No hay caja abierta. Abre la caja primero.'); window.location='/cajas'; });
 }
 
-function buscarYAgregar(){
-    var q = document.getElementById('barcode').value.trim();
-    if(!q) return;
-    fetch('/api/productos/'+encodeURIComponent(q)).then(function(r){
-        if(!r.ok){ fetch('/api/productos?q='+encodeURIComponent(q)).then(function(r2){ return r2.json(); }).then(function(ps){
-            if(ps.length>0) agregarAlCarrito(ps[0]); else alert('Producto no encontrado');
-        }); return; }
-        return r.json();
-    }).then(function(p){
-        if(p && p.codigo) agregarAlCarrito(p);
-        document.getElementById('barcode').value='';
-        document.getElementById('barcode').focus();
-    });
-}
-
-function agregarAlCarrito(p){
-    if(!currentTicket){ iniciarVenta(); setTimeout(function(){ agregarAlCarrito(p); }, 500); return; }
-    var existente = articulos.find(function(a){ return a.producto_codigo === p.codigo; });
-    if(existente){
-        existente.cantidad += 1;
-        actualizarCarrito();
-        return;
-    }
-    articulos.push({
-        producto_codigo: p.codigo,
-        producto_nombre: p.descripcion,
-        cantidad: 1,
-        precio_usado: p.pventa,
-        ganancia: p.pventa - p.pcosto
-    });
-    actualizarCarrito();
+function agregarAlCarrito(codigo){
+  if(!currentTicket){ iniciarVenta(); }
+  var p = allProductos.find(function(x){ return x.codigo === codigo; });
+  if(!p) return;
+  var existente = articulos.find(function(a){ return a.producto_codigo === codigo; });
+  if(existente){ existente.cantidad += 1; actualizarCarrito(); return; }
+  articulos.push({producto_codigo:p.codigo, producto_nombre:p.descripcion, cantidad:1, precio_usado:p.pventa, ganancia:p.pventa-p.pcosto});
+  actualizarCarrito();
 }
 
 function actualizarCarrito(){
-    var tbody = document.getElementById('carrito-items');
-    if(articulos.length===0){
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Escanea un producto para comenzar</td></tr>';
-    } else {
-        tbody.innerHTML = articulos.map(function(a,i){
-            var total = a.cantidad * a.precio_usado;
-            return '<tr><td>'+a.producto_codigo+'</td><td>'+a.producto_nombre+'</td>'+
-                '<td><button class="btn btn-sm btn-outline" onclick="cambiarCantidad('+i+',-1)">-</button> '+a.cantidad+' <button class="btn btn-sm btn-outline" onclick="cambiarCantidad('+i+',1)">+</button></td>'+
-                '<td>$'+a.precio_usado.toFixed(2)+'</td><td>$'+total.toFixed(2)+'</td>'+
-                '<td><button class="btn btn-sm btn-danger" onclick="eliminarArticulo('+i+')">X</button></td></tr>';
-        }).join('');
-    }
-    var subtotal = articulos.reduce(function(s,a){ return s + a.cantidad * a.precio_usado; }, 0);
-    var total = subtotal;
-    var numArts = articulos.reduce(function(s,a){ return s + a.cantidad; }, 0);
-    document.getElementById('res-subtotal').textContent = '$'+subtotal.toFixed(2);
-    document.getElementById('res-total').textContent = '$'+total.toFixed(2);
-    document.getElementById('res-articulos').textContent = numArts;
+  var items = document.getElementById('cart-items');
+  var count = articulos.reduce(function(s,a){ return s + a.cantidad; }, 0);
+  var total = articulos.reduce(function(s,a){ return s + a.cantidad * a.precio_usado; }, 0);
+  document.getElementById('cart-count').textContent = count;
+  document.getElementById('fab-count').textContent = count;
+  document.getElementById('cart-total').textContent = '$'+total.toFixed(2);
+  if(!articulos.length){
+    items.innerHTML = '<div class="empty-grid">Agrega productos para comenzar</div>';
+    return;
+  }
+  items.innerHTML = articulos.map(function(a,i){
+    return '<div class="cart-item">'+
+      '<div class="ci-info"><div class="ci-name">'+a.producto_nombre+'</div><div class="ci-price">$'+(a.cantidad*a.precio_usado).toFixed(2)+'</div></div>'+
+      '<div class="ci-qty"><button onclick="cambiarCantidad('+i+',-1)">−</button><span>'+a.cantidad+'</span><button onclick="cambiarCantidad('+i+',1)">+</button></div>'+
+      '<span class="ci-remove" onclick="eliminarArticulo('+i+')">✕</span></div>';
+  }).join('');
 }
 
-function cambiarCantidad(idx, delta){
-    if(!articulos[idx]) return;
-    articulos[idx].cantidad = Math.max(0.5, articulos[idx].cantidad + delta);
-    actualizarCarrito();
+function cambiarCantidad(idx,delta){
+  if(!articulos[idx]) return;
+  articulos[idx].cantidad = Math.max(1, articulos[idx].cantidad + delta);
+  actualizarCarrito();
 }
 
 function eliminarArticulo(idx){
-    articulos.splice(idx, 1);
-    if(articulos.length===0 && currentTicket){
-        fetch('/api/tickets/'+currentTicket+'/cancelar', {method:'POST'});
-        currentTicket = null;
-    }
-    actualizarCarrito();
+  articulos.splice(idx,1);
+  if(!articulos.length && currentTicket){ fetch('/api/tickets/'+currentTicket+'/cancelar',{method:'POST'}); currentTicket=null; }
+  actualizarCarrito();
 }
 
 function cobrar(){
-    if(!currentTicket || articulos.length===0){ alert('Carrito vacio'); return; }
-    var pagoCon = parseFloat(document.getElementById('pagoCon').value);
-    var formaPago = document.getElementById('formaPago').value;
-    var total = articulos.reduce(function(s,a){ return s + a.cantidad * a.precio_usado; }, 0);
-    if(!pagoCon || pagoCon < total){ alert('El monto recibido es insuficiente. Total: $'+total.toFixed(2)); return; }
-
-    // Primero guardar articulos
-    var promises = articulos.map(function(a){
-        return fetch('/api/tickets/'+currentTicket+'/articulo', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({producto_codigo: a.producto_codigo, cantidad: a.cantidad})});
-    });
-    Promise.all(promises).then(function(){
-        fetch('/api/tickets/'+currentTicket+'/cobrar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pago_con: pagoCon, forma_pago: formaPago})})
-        .then(function(r){ return r.json(); }).then(function(res){
-            if(res.cambio && parseFloat(res.cambio) > 0){
-                alert('Cambio: $'+parseFloat(res.cambio).toFixed(2));
-            }
-            currentTicket = null;
-            articulos = [];
-            actualizarCarrito();
-            document.getElementById('pagoCon').value = '';
-            document.getElementById('barcode').focus();
-        });
-    });
+  if(!currentTicket || !articulos.length){ alert('Carrito vacio'); return; }
+  var pagoCon = parseFloat(document.getElementById('pagoCon').value);
+  var formaPago = document.getElementById('formaPago').value;
+  var total = articulos.reduce(function(s,a){ return s + a.cantidad * a.precio_usado; }, 0);
+  if(!pagoCon || pagoCon < total){ alert('Monto insuficiente. Total: $'+total.toFixed(2)); return; }
+  Promise.all(articulos.map(function(a){
+    return fetch('/api/tickets/'+currentTicket+'/articulo', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({producto_codigo:a.producto_codigo, cantidad:a.cantidad})});
+  })).then(function(){
+    return fetch('/api/tickets/'+currentTicket+'/cobrar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pago_con:pagoCon, forma_pago:formaPago})});
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if(res.cambio && parseFloat(res.cambio) > 0) alert('Cambio: $'+parseFloat(res.cambio).toFixed(2));
+    currentTicket = null; articulos = [];
+    actualizarCarrito();
+    document.getElementById('pagoCon').value = '';
+    if(window.innerWidth <= 768) toggleCart();
+  });
 }
 
 function cancelarTicket(){
-    if(currentTicket){
-        if(!confirm('Cancelar esta venta?')) return;
-        fetch('/api/tickets/'+currentTicket+'/cancelar', {method:'POST'});
-    }
-    currentTicket = null;
-    articulos = [];
-    actualizarCarrito();
-    document.getElementById('barcode').focus();
+  if(currentTicket){ if(!confirm('Cancelar esta venta?')) return; fetch('/api/tickets/'+currentTicket+'/cancelar',{method:'POST'}); }
+  currentTicket = null; articulos = []; actualizarCarrito();
 }
 
-iniciarVenta();
+function toggleCart(){
+  document.getElementById('cart-panel').classList.toggle('open');
+  document.getElementById('cart-overlay').classList.toggle('open');
+}
 </script>
 {{end}}

@@ -140,6 +140,8 @@ func main() {
 	mux.HandleFunc("POST /api/promociones", handlePromocionesCreate)
 	mux.HandleFunc("DELETE /api/promociones/{id}", handlePromocionesDelete)
 
+	mux.HandleFunc("POST /api/off/sync", withAdmin(handleOffSync))
+
 	mux.HandleFunc("GET /api/reportes/dashboard", handleReportesDashboard)
 	mux.HandleFunc("GET /api/reportes/ventas-diarias", handleReportesVentasDiarias)
 	mux.HandleFunc("GET /api/reportes/productos-mas-vendidos", handleReportesTopProductos)

@@ -7,7 +7,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+	"io"
+	"net/url"
+	"sync"
 )
+
+var offSync sync.Mutex
 
 // --- Productos ---
 
@@ -983,6 +989,62 @@ func handleReportesVentasDiarias(w http.ResponseWriter, r *http.Request) {
 		rs = []map[string]interface{}{}
 	}
 	jsonResp(w, rs)
+}
+
+func handleOffSync(w http.ResponseWriter, r *http.Request) {
+	if !offSync.TryLock() {
+		jsonErr(w, "sync already running", 429)
+		return
+	}
+	defer offSync.Unlock()
+
+	rows, err := db.Query("SELECT codigo FROM PRODUCTOS WHERE codigo NOT IN (SELECT codigo FROM PRODUCTOS_OFF)")
+	if err != nil {
+		jsonErr(w, err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+
+	type result struct {
+		Codigo  string `json:"codigo"`
+		Nombre  string `json:"nombre"`
+		Imagen  string `json:"imagen"`
+		Error   string `json:"error,omitempty"`
+	}
+	results := make([]result, 0)
+
+	for rows.Next() {
+		var codigo string
+		rows.Scan(&codigo)
+		r, _ := url.JoinPath("https://world.openfoodfacts.org/api/v2/product/", codigo, ".json")
+		resp, err := http.Get(r)
+		if err != nil {
+			results = append(results, result{Codigo: codigo, Error: err.Error()})
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		var off struct {
+			Status  int `json:"status"`
+			Product *struct {
+				Name     string `json:"product_name"`
+				ImageURL string `json:"image_front_url"`
+				SmallURL string `json:"image_front_small_url"`
+			} `json:"product"`
+		}
+		json.Unmarshal(body, &off)
+		if off.Status != 1 || off.Product == nil {
+			results = append(results, result{Codigo: codigo, Error: "not found"})
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		db.Exec("INSERT OR REPLACE INTO PRODUCTOS_OFF (codigo, image_url, image_small, name, last_sync) VALUES (?,?,?,?,?)",
+			codigo, off.Product.ImageURL, off.Product.SmallURL, off.Product.Name, time.Now().Format(time.RFC3339))
+		results = append(results, result{Codigo: codigo, Nombre: off.Product.Name, Imagen: off.Product.SmallURL})
+		time.Sleep(500 * time.Millisecond)
+	}
+	jsonResp(w, results)
 }
 
 func handleReportesTopProductos(w http.ResponseWriter, r *http.Request) {

@@ -27,6 +27,9 @@ type Producto struct {
 	PorcentajeGanancia  int     `json:"porcentaje_ganancia"`
 	Componentes         string  `json:"componentes"`
 	Impuestos           string  `json:"impuestos"`
+	OffImageUrl         string  `json:"off_image_url,omitempty"`
+	OffImageSmall       string  `json:"off_image_small,omitempty"`
+	OffName             string  `json:"off_name,omitempty"`
 }
 
 type Cliente struct {
@@ -192,7 +195,7 @@ func nextFolio(tx *sql.Tx) int {
 }
 
 func listProductos() ([]Producto, error) {
-	rows, err := db.Query(`SELECT codigo, descripcion, tventa, COALESCE(pcosto,0), COALESCE(pventa,0), dept, provid, umedida, COALESCE(mayoreo,0), iprioridad, COALESCE(dinventario,0), COALESCE(dinvminimo,0), COALESCE(dinvmaximo,0), COALESCE(checado_en,''), COALESCE(porcentaje_ganancia,0), COALESCE(componentes,''), COALESCE(impuestos,'') FROM PRODUCTOS ORDER BY descripcion`)
+	rows, err := db.Query(`SELECT p.codigo, p.descripcion, p.tventa, COALESCE(p.pcosto,0), COALESCE(p.pventa,0), p.dept, p.provid, p.umedida, COALESCE(p.mayoreo,0), p.iprioridad, COALESCE(p.dinventario,0), COALESCE(p.dinvminimo,0), COALESCE(p.dinvmaximo,0), COALESCE(p.checado_en,''), COALESCE(p.porcentaje_ganancia,0), COALESCE(p.componentes,''), COALESCE(p.impuestos,''), o.image_url, o.image_small, o.name FROM PRODUCTOS p LEFT JOIN PRODUCTOS_OFF o ON p.codigo = o.codigo ORDER BY p.descripcion`)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +204,7 @@ func listProductos() ([]Producto, error) {
 	ps := make([]Producto, 0)
 	for rows.Next() {
 		var p Producto
-		rows.Scan(&p.Codigo, &p.Descripcion, &p.Tventa, &p.Pcosto, &p.Pventa, &p.Dept, &p.Provid, &p.Umedida, &p.Mayoreo, &p.Iprioridad, &p.Dinventario, &p.Dinvminimo, &p.Dinvmaximo, &p.ChecadoEn, &p.PorcentajeGanancia, &p.Componentes, &p.Impuestos)
+		rows.Scan(&p.Codigo, &p.Descripcion, &p.Tventa, &p.Pcosto, &p.Pventa, &p.Dept, &p.Provid, &p.Umedida, &p.Mayoreo, &p.Iprioridad, &p.Dinventario, &p.Dinvminimo, &p.Dinvmaximo, &p.ChecadoEn, &p.PorcentajeGanancia, &p.Componentes, &p.Impuestos, &p.OffImageUrl, &p.OffImageSmall, &p.OffName)
 		ps = append(ps, p)
 	}
 	return ps, nil

@@ -1,4 +1,4 @@
-module abarrotes-pdv
+module migrate_fb
 
 go 1.22.0
 

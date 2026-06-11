@@ -403,6 +403,21 @@ func handleCajasList(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, cs)
 }
 
+func handleCajaDefault(w http.ResponseWriter, r *http.Request) {
+	machine := "localhost"
+	var c Caja
+	err := db.QueryRow("SELECT id, COALESCE(nombre,''), COALESCE(ultima_ip,''), COALESCE(ultimo_ingreso,''), COALESCE(nombre_pc,'') FROM CAJAS ORDER BY id LIMIT 1").Scan(&c.ID, &c.Nombre, &c.UltimaIP, &c.UltimoIngreso, &c.NombrePC)
+	if err == sql.ErrNoRows {
+		_, err = db.Exec("INSERT INTO CAJAS (nombre, ultima_ip, nombre_pc) VALUES (?,?,?)", "Caja Principal", "127.0.0.1", machine)
+		if err != nil {
+			jsonErr(w, err.Error(), 500)
+			return
+		}
+		db.QueryRow("SELECT id, COALESCE(nombre,''), COALESCE(ultima_ip,''), COALESCE(ultimo_ingreso,''), COALESCE(nombre_pc,'') FROM CAJAS ORDER BY id LIMIT 1").Scan(&c.ID, &c.Nombre, &c.UltimaIP, &c.UltimoIngreso, &c.NombrePC)
+	}
+	jsonResp(w, c)
+}
+
 func handleCajasCreate(w http.ResponseWriter, r *http.Request) {
 	var c Caja
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 type PageData struct {
@@ -59,6 +60,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: "session", Value: user, Path: "/"})
+	http.SetCookie(w, &http.Cookie{Name: "user_id", Value: strconv.Itoa(id), Path: "/"})
 	http.SetCookie(w, &http.Cookie{Name: "role", Value: rol, Path: "/"})
 	if rol == "helper" {
 		http.Redirect(w, r, "/ventas/pos", http.StatusSeeOther)

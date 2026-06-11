@@ -5,6 +5,8 @@
 <div id="caja-actions"></div>
 
 <script>
+function getCookie(n){ var m=document.cookie.match(new RegExp('(^| )'+n+'=([^;]+)')); return m?m[2]:null; }
+
 function checkCaja(){
     fetch('/api/operaciones/activa').then(r=>r.json()).then(function(res){
         var status = document.getElementById('caja-status');
@@ -40,8 +42,11 @@ function checkCaja(){
 function abrirCaja(e){
     e.preventDefault();
     var dinero = parseFloat(document.getElementById('dineroInicial').value)||0;
-    fetch('/api/operaciones/abrir', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({caja_id:1, usuario_id:7, dinero_en_caja:dinero})})
-    .then(function(r){ if(r.ok) checkCaja(); else r.json().then(function(d){ alert('Error: '+d.error); }); });
+    var uid = parseInt(getCookie('user_id')) || 1;
+    fetch('/api/cajas/default').then(r=>r.json()).then(function(caja){
+        fetch('/api/operaciones/abrir', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({caja_id:caja.id, usuario_id:uid, dinero_en_caja:dinero})})
+        .then(function(r){ if(r.ok) checkCaja(); else r.json().then(function(d){ alert('Error: '+d.error); }); });
+    });
     return false;
 }
 
@@ -54,14 +59,17 @@ function registrarMovimiento(e){
     e.preventDefault();
     fetch('/api/operaciones/activa').then(function(r){ return r.json(); }).then(function(res){
         if(!res.activa){ alert('No hay caja abierta'); return; }
-        fetch('/api/movimientos', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-            operacion_id: res.operacion.id,
-            monto: parseFloat(document.getElementById('movMonto').value)||0,
-            comentarios: document.getElementById('movComent').value,
-            tipo: document.getElementById('movTipo').value,
-            caja_id: 1,
-            cajero_id: 7
-        })}).then(function(r){ if(r.ok){ document.getElementById('movMonto').value=''; document.getElementById('movComent').value=''; checkCaja(); } });
+        var uid = parseInt(getCookie('user_id')) || 1;
+        fetch('/api/cajas/default').then(function(r){ return r.json(); }).then(function(caja){
+            fetch('/api/movimientos', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+                operacion_id: res.operacion.id,
+                monto: parseFloat(document.getElementById('movMonto').value)||0,
+                comentarios: document.getElementById('movComent').value,
+                tipo: document.getElementById('movTipo').value,
+                caja_id: caja.id,
+                cajero_id: uid
+            })}).then(function(r){ if(r.ok){ document.getElementById('movMonto').value=''; document.getElementById('movComent').value=''; checkCaja(); } });
+        });
     });
     return false;
 }

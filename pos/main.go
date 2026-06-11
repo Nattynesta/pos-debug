@@ -26,6 +26,8 @@ var staticFS embed.FS
 //go:embed schema.sql
 var schemaSQL string
 
+
+
 var db *sql.DB
 var tmpl *template.Template
 var pageTmpls map[string]*template.Template
@@ -108,6 +110,7 @@ func main() {
 	mux.HandleFunc("PUT /api/usuarios/{id}", handleUsuariosUpdate)
 
 	mux.HandleFunc("GET /api/cajas", handleCajasList)
+	mux.HandleFunc("GET /api/cajas/default", handleCajaDefault)
 	mux.HandleFunc("POST /api/cajas", handleCajasCreate)
 
 	mux.HandleFunc("GET /api/operaciones", handleOperacionesList)
@@ -196,11 +199,23 @@ func migrate(db *sql.DB) error {
 		db.Exec(`INSERT INTO USUARIOS (usuario, clave, activo, created_on, rol) VALUES (?, ?, 't', ?, 'admin')`,
 			"admin", hashPassword("admin"), time.Now().Format("2006-01-02 15:04:05"))
 	}
+	var helperExists int
+	db.QueryRow("SELECT COUNT(*) FROM USUARIOS WHERE usuario='helper'").Scan(&helperExists)
+	if helperExists == 0 {
+		db.Exec(`INSERT INTO USUARIOS (usuario, clave, activo, created_on, rol) VALUES (?, ?, 't', ?, 'helper')`,
+			"helper", hashPassword("helper"), time.Now().Format("2006-01-02 15:04:05"))
+	}
 
 	var hasRol int
 	db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('USUARIOS') WHERE name='rol'").Scan(&hasRol)
 	if hasRol == 0 {
 		db.Exec(`ALTER TABLE USUARIOS ADD COLUMN rol TEXT DEFAULT 'helper'`)
+	}
+
+	var hasOff int
+	db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='PRODUCTOS_OFF'").Scan(&hasOff)
+	if hasOff == 0 {
+		db.Exec(`CREATE TABLE PRODUCTOS_OFF (codigo TEXT PRIMARY KEY, image_url TEXT, image_small TEXT, name TEXT, last_sync TEXT)`)
 	}
 
 	return nil

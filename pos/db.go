@@ -138,6 +138,8 @@ type VentaTicket struct {
 	FormaPago      string   `json:"forma_pago"`
 	Referencia     string   `json:"referencia"`
 	TotalDevuelto  float64  `json:"total_devuelto"`
+	ClienteNombre  string   `json:"cliente_nombre"`
+	ClienteDireccion string `json:"cliente_direccion"`
 	Articulos      []TicketArticulo `json:"articulos,omitempty"`
 }
 

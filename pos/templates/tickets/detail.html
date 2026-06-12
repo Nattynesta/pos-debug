@@ -42,15 +42,18 @@ fetch('/api/tickets/'+ticketId).then(r=>r.json()).then(function(t){
     document.getElementById('td-local').textContent = t.cliente_direccion || '-';
     document.getElementById('td-cajero').textContent = t.cajero_id || '-';
     var estado = document.getElementById('td-estado');
+    var esCredito = t.forma_pago==='c' && t.esta_cancelado!=='t';
     if(t.esta_cancelado==='t'){ estado.textContent='Cancelado'; estado.className='btn btn-sm btn-danger'; }
     else if(t.esta_abierto==='t'){ estado.textContent='Abierto'; estado.className='btn btn-sm btn-warning'; }
+    else if(esCredito){ estado.textContent='Crédito'; estado.className='btn btn-sm btn-danger'; }
     else { estado.textContent='Pagado'; estado.className='btn btn-sm btn-success'; }
     var prio = document.getElementById('td-prioridad');
     if(t.prioridad > 0){
         prio.textContent = 'Prioridad: '+t.prioridad;
         prio.className = 'btn btn-sm ' + (t.prioridad >= 3 ? 'btn-danger' : (t.prioridad >= 2 ? 'btn-warning' : 'btn-outline'));
     } else {
-        prio.style.display = 'none';
+        prio.textContent = 'Prioridad: Normal';
+        prio.className = 'btn btn-sm btn-outline';
     }
     document.getElementById('td-subtotal').textContent = '$'+t.subtotal.toFixed(2);
     document.getElementById('td-impuestos').textContent = '$'+t.impuestos.toFixed(2);

@@ -668,8 +668,7 @@ func handleTicketsList(w http.ResponseWriter, r *http.Request) {
 	ts := make([]VentaTicket, 0)
 	for rows.Next() {
 		var t VentaTicket
-		var clienteNombre, clienteDireccion string
-		rows.Scan(&t.ID, &t.Folio, &t.CajaID, &t.CajeroID, &t.Nombre, &t.Prioridad, &t.CreadoEn, &t.Subtotal, &t.Impuestos, &t.Total, &t.Ganancia, &t.EstaAbierto, &t.ClienteID, &t.VendidoEn, &t.EsModificable, &t.PagoCon, &t.Moneda, &t.NumeroArticulos, &t.PagadoEn, &t.EstaCancelado, &t.OperacionID, &t.FormaPago, &t.Referencia, &t.TotalDevuelto, &clienteNombre, &clienteDireccion)
+		rows.Scan(&t.ID, &t.Folio, &t.CajaID, &t.CajeroID, &t.Nombre, &t.Prioridad, &t.CreadoEn, &t.Subtotal, &t.Impuestos, &t.Total, &t.Ganancia, &t.EstaAbierto, &t.ClienteID, &t.VendidoEn, &t.EsModificable, &t.PagoCon, &t.Moneda, &t.NumeroArticulos, &t.PagadoEn, &t.EstaCancelado, &t.OperacionID, &t.FormaPago, &t.Referencia, &t.TotalDevuelto, &t.ClienteNombre, &t.ClienteDireccion)
 		ts = append(ts, t)
 	}
 	if ts == nil {
@@ -720,8 +719,7 @@ func handleTicketCrear(w http.ResponseWriter, r *http.Request) {
 func handleTicketGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var t VentaTicket
-	var clienteNombre, clienteDireccion string
-	err := db.QueryRow(`SELECT t.id, t.folio, t.caja_id, t.cajero_id, COALESCE(t.nombre,''), t.prioridad, t.creado_en, COALESCE(t.subtotal,0), COALESCE(t.impuestos,0), COALESCE(t.total,0), COALESCE(t.ganancia,0), t.esta_abierto, t.cliente_id, COALESCE(t.vendido_en,''), t.es_modificable, COALESCE(t.pago_con,0), COALESCE(t.moneda,''), COALESCE(t.numero_articulos,0), COALESCE(t.pagado_en,''), t.esta_cancelado, t.operacion_id, COALESCE(t.forma_pago,''), COALESCE(t.referencia,''), COALESCE(t.total_devuelto,0), COALESCE(c.nombre,''), COALESCE(c.direccion,'') FROM VENTATICKETS t LEFT JOIN CLIENTES c ON t.cliente_id=c.numero WHERE t.id=?`, id).Scan(&t.ID, &t.Folio, &t.CajaID, &t.CajeroID, &t.Nombre, &t.Prioridad, &t.CreadoEn, &t.Subtotal, &t.Impuestos, &t.Total, &t.Ganancia, &t.EstaAbierto, &t.ClienteID, &t.VendidoEn, &t.EsModificable, &t.PagoCon, &t.Moneda, &t.NumeroArticulos, &t.PagadoEn, &t.EstaCancelado, &t.OperacionID, &t.FormaPago, &t.Referencia, &t.TotalDevuelto, &clienteNombre, &clienteDireccion)
+	err := db.QueryRow(`SELECT t.id, t.folio, t.caja_id, t.cajero_id, COALESCE(t.nombre,''), t.prioridad, t.creado_en, COALESCE(t.subtotal,0), COALESCE(t.impuestos,0), COALESCE(t.total,0), COALESCE(t.ganancia,0), t.esta_abierto, t.cliente_id, COALESCE(t.vendido_en,''), t.es_modificable, COALESCE(t.pago_con,0), COALESCE(t.moneda,''), COALESCE(t.numero_articulos,0), COALESCE(t.pagado_en,''), t.esta_cancelado, t.operacion_id, COALESCE(t.forma_pago,''), COALESCE(t.referencia,''), COALESCE(t.total_devuelto,0), COALESCE(c.nombre,''), COALESCE(c.direccion,'') FROM VENTATICKETS t LEFT JOIN CLIENTES c ON t.cliente_id=c.numero WHERE t.id=?`, id).Scan(&t.ID, &t.Folio, &t.CajaID, &t.CajeroID, &t.Nombre, &t.Prioridad, &t.CreadoEn, &t.Subtotal, &t.Impuestos, &t.Total, &t.Ganancia, &t.EstaAbierto, &t.ClienteID, &t.VendidoEn, &t.EsModificable, &t.PagoCon, &t.Moneda, &t.NumeroArticulos, &t.PagadoEn, &t.EstaCancelado, &t.OperacionID, &t.FormaPago, &t.Referencia, &t.TotalDevuelto, &t.ClienteNombre, &t.ClienteDireccion)
 	if err == sql.ErrNoRows {
 		jsonErr(w, "Ticket no encontrado", 404)
 		return
@@ -827,11 +825,10 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	var total float64
-	tx.QueryRow("SELECT COALESCE(total,0) FROM VENTATICKETS WHERE id=?", id).Scan(&total)
-
+	var total, ganancia float64
 	var operacionID int
-	tx.QueryRow("SELECT operacion_id FROM VENTATICKETS WHERE id=?", id).Scan(&operacionID)
+	var clienteID sql.NullInt64
+	tx.QueryRow("SELECT COALESCE(total,0), COALESCE(ganancia,0), operacion_id, cliente_id FROM VENTATICKETS WHERE id=?", id).Scan(&total, &ganancia, &operacionID, &clienteID)
 
 	_, err = tx.Exec(`UPDATE VENTATICKETS SET esta_abierto='f', pagado_en=?, pago_con=?, forma_pago=?, total_devuelto=?, vendido_en=? WHERE id=?`,
 		now(), req.PagoCon, req.FormaPago, req.PagoCon-total, now(), id)
@@ -840,8 +837,18 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx.Exec(`UPDATE OPERACIONES SET ventas = ventas + ?, ingresos_efectivo = ingresos_efectivo + ?, ganancias = ganancias + (SELECT COALESCE(ganancia,0) FROM VENTATICKETS WHERE id=?) WHERE id=?`,
-		total, req.PagoCon, id, operacionID)
+	switch req.FormaPago {
+	case "e":
+		tx.Exec(`UPDATE OPERACIONES SET ventas = ventas + ?, ingresos_efectivo = ingresos_efectivo + ?, ganancias = ganancias + ? WHERE id=?`,
+			total, req.PagoCon, ganancia, operacionID)
+	case "c":
+		tx.Exec(`UPDATE OPERACIONES SET ventas = ventas + ?, ganancias = ganancias + ? WHERE id=?`,
+			total, ganancia, operacionID)
+		if clienteID.Valid {
+			tx.Exec(`UPDATE CLIENTES SET dsaldoactual = COALESCE(dsaldoactual,0) + ?, dtactualizasaldo = ? WHERE numero = ?`,
+				total, now(), clienteID.Int64)
+		}
+	}
 
 	tx.Commit()
 	jsonResp(w, map[string]string{"ok": "Cobro exitoso", "cambio": fmt.Sprintf("%.2f", req.PagoCon-total)})
@@ -1185,7 +1192,7 @@ func handleOffSync(w http.ResponseWriter, r *http.Request) {
 	}
 	defer offSync.Unlock()
 
-	rows, err := db.Query("SELECT codigo FROM PRODUCTOS WHERE codigo NOT IN (SELECT codigo FROM PRODUCTOS_OFF)")
+	rows, err := db.Query("SELECT codigo FROM PRODUCTOS WHERE codigo NOT IN (SELECT codigo FROM productos_openfoods)")
 	if err != nil {
 		jsonErr(w, err.Error(), 500)
 		return
@@ -1215,9 +1222,13 @@ func handleOffSync(w http.ResponseWriter, r *http.Request) {
 		var off struct {
 			Status  int `json:"status"`
 			Product *struct {
-				Name     string `json:"product_name"`
-				ImageURL string `json:"image_front_url"`
-				SmallURL string `json:"image_front_small_url"`
+				Name        string `json:"product_name"`
+				ImageURL    string `json:"image_front_url"`
+				SmallURL    string `json:"image_front_small_url"`
+				GrandeURL   string `json:"image_front_thumb_url"`
+				Brands      string `json:"brands"`
+				Categories  string `json:"categories"`
+				Nutriscore  string `json:"nutrition_grades"`
 			} `json:"product"`
 		}
 		json.Unmarshal(body, &off)
@@ -1226,8 +1237,8 @@ func handleOffSync(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
-		db.Exec("INSERT OR REPLACE INTO PRODUCTOS_OFF (codigo, image_url, image_small, name, last_sync) VALUES (?,?,?,?,?)",
-			codigo, off.Product.ImageURL, off.Product.SmallURL, off.Product.Name, time.Now().Format(time.RFC3339))
+		db.Exec(`INSERT OR REPLACE INTO productos_openfoods (codigo, nombre, marca, categorias, nutriscore, imagen_url, imagen_small, imagen_grande, updated_at) VALUES (?,?,?,?,?,?,?,?,datetime('now'))`,
+			codigo, off.Product.Name, off.Product.Brands, off.Product.Categories, off.Product.Nutriscore, off.Product.ImageURL, off.Product.SmallURL, off.Product.GrandeURL)
 		results = append(results, result{Codigo: codigo, Nombre: off.Product.Name, Imagen: off.Product.SmallURL})
 		time.Sleep(500 * time.Millisecond)
 	}

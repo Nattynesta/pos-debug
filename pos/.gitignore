@@ -7,3 +7,6 @@
 *.dll
 *.so
 *.dylib
+*.log
+pos_server
+pos_server.exe

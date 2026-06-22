@@ -755,6 +755,10 @@ func handleTicketAddArticulo(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "JSON invalido", 400)
 		return
 	}
+	if req.Cantidad <= 0 {
+		jsonErr(w, "Cantidad debe ser mayor a 0", 400)
+		return
+	}
 
 	var p Producto
 	err := db.QueryRow(`SELECT codigo, COALESCE(descripcion,''), tventa, COALESCE(pcosto,0), COALESCE(pventa,0), dept, provid, umedida, COALESCE(mayoreo,0), iprioridad, COALESCE(dinventario,0), COALESCE(dinvminimo,0), COALESCE(dinvmaximo,0), COALESCE(checado_en,''), COALESCE(porcentaje_ganancia,0), COALESCE(componentes,''), COALESCE(impuestos,'') FROM PRODUCTOS WHERE codigo=?`, req.ProductoCodigo).Scan(&p.Codigo, &p.Descripcion, &p.Tventa, &p.Pcosto, &p.Pventa, &p.Dept, &p.Provid, &p.Umedida, &p.Mayoreo, &p.Iprioridad, &p.Dinventario, &p.Dinvminimo, &p.Dinvmaximo, &p.ChecadoEn, &p.PorcentajeGanancia, &p.Componentes, &p.Impuestos)
@@ -830,8 +834,12 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 	var clienteID sql.NullInt64
 	tx.QueryRow("SELECT COALESCE(total,0), COALESCE(ganancia,0), operacion_id, cliente_id FROM VENTATICKETS WHERE id=?", id).Scan(&total, &ganancia, &operacionID, &clienteID)
 
+	cambio := req.PagoCon - total
+	if cambio < 0 {
+		cambio = 0
+	}
 	_, err = tx.Exec(`UPDATE VENTATICKETS SET esta_abierto='f', pagado_en=?, pago_con=?, forma_pago=?, total_devuelto=?, vendido_en=? WHERE id=?`,
-		now(), req.PagoCon, req.FormaPago, req.PagoCon-total, now(), id)
+		now(), req.PagoCon, req.FormaPago, cambio, now(), id)
 	if err != nil {
 		jsonErr(w, err.Error(), 400)
 		return

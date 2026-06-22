@@ -26,6 +26,9 @@ var staticFS embed.FS
 //go:embed schema.sql
 var schemaSQL string
 
+//go:embed seed.sql
+var seedSQL string
+
 
 
 var db *sql.DB
@@ -229,6 +232,22 @@ func migrate(db *sql.DB) error {
 	db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('VENTATICKETS') WHERE name='prioridad'").Scan(&hasPrioridad)
 	if hasPrioridad == 0 {
 		db.Exec(`ALTER TABLE VENTATICKETS ADD COLUMN prioridad INTEGER DEFAULT 0`)
+	}
+
+	var productCount int
+	db.QueryRow("SELECT COUNT(*) FROM PRODUCTOS").Scan(&productCount)
+	if productCount == 0 {
+		cleanSeed := regexp.MustCompile(`(?m)^\s*--.*$`).ReplaceAllString(seedSQL, "")
+		seedStatements := strings.Split(cleanSeed, ";")
+		for _, stmt := range seedStatements {
+			stmt = strings.TrimSpace(stmt)
+			if stmt == "" {
+				continue
+			}
+			if _, err := db.Exec(stmt); err != nil {
+				return fmt.Errorf("error seeding: %q: %w", stmt[:min(len(stmt), 60)], err)
+			}
+		}
 	}
 
 	return nil

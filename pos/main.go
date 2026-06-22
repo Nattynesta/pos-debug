@@ -222,11 +222,22 @@ func migrate(db *sql.DB) error {
 		db.Exec(`ALTER TABLE USUARIOS ADD COLUMN rol TEXT DEFAULT 'helper'`)
 	}
 
-	var hasOff int
-	db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='PRODUCTOS_OFF'").Scan(&hasOff)
-	if hasOff == 0 {
-		db.Exec(`CREATE TABLE PRODUCTOS_OFF (codigo TEXT PRIMARY KEY, image_url TEXT, image_small TEXT, name TEXT, last_sync TEXT)`)
+	productoColumns := []string{"imagen_local", "marca", "categorias", "ingredientes", "nutriscore", "cantidad_presentacion", "nutricion", "off_image_url", "off_image_small"}
+	for _, col := range productoColumns {
+		var hasCol int
+		db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('PRODUCTOS') WHERE name=?", col).Scan(&hasCol)
+		if hasCol == 0 {
+			db.Exec("ALTER TABLE PRODUCTOS ADD COLUMN "+col+" TEXT DEFAULT ''")
+		}
 	}
+
+	var hasOff int
+	db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='productos_openfoods'").Scan(&hasOff)
+	if hasOff == 0 {
+		db.Exec(`CREATE TABLE productos_openfoods (codigo TEXT PRIMARY KEY, nombre TEXT, marca TEXT, categorias TEXT, ingredientes TEXT, nutricion TEXT, nutriscore TEXT, cantidad_presentacion TEXT, imagen_url TEXT, imagen_small TEXT, imagen_grande TEXT, updated_at TEXT)`)
+	}
+	// Legacy table from old schema
+	db.Exec("CREATE TABLE IF NOT EXISTS PRODUCTOS_OFF (codigo TEXT PRIMARY KEY, image_url TEXT, image_small TEXT, name TEXT, last_sync TEXT)")
 
 	var hasPrioridad int
 	db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('VENTATICKETS') WHERE name='prioridad'").Scan(&hasPrioridad)

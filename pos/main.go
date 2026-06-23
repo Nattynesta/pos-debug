@@ -81,7 +81,20 @@ func main() {
 	mux := http.NewServeMux()
 
 	staticSub, _ := fs.Sub(staticFS, "static")
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))))
+	localStatic := http.Dir("static")
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "" || r.URL.Path == "/" {
+			http.NotFound(w, r)
+			return
+		}
+		f, err := localStatic.Open(r.URL.Path)
+		if err == nil {
+			f.Close()
+			http.FileServer(localStatic).ServeHTTP(w, r)
+			return
+		}
+		http.FileServer(http.FS(staticSub)).ServeHTTP(w, r)
+	})))
 
 	mux.HandleFunc("GET /api/productos", handleProductosList)
 	mux.HandleFunc("POST /api/productos", handleProductosCreate)

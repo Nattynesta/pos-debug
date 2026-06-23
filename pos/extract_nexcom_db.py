@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Extract POS database from Nexcom and create a local SQLite copy."""
+import hashlib
 import json
 import sqlite3
 import urllib.request
@@ -95,7 +96,7 @@ def main():
         cur.execute(
             "INSERT OR REPLACE INTO USUARIOS (id, nombre_completo, direccion, telefono, usuario, clave, activo, created_on, correo, esta_en_caja_id, rol) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (u['id'], u.get('nombre_completo', ''), u.get('direccion', ''),
-             u.get('telefono', ''), u['usuario'], 'admin',  # default password
+             u.get('telefono', ''), u['usuario'], hashlib.sha256(b'admin').hexdigest(),  # hashed password
              u.get('activo', 't'), u.get('created_on', ''),
              u.get('correo', ''), u.get('esta_en_caja_id'), u.get('rol', 'helper'))
         )

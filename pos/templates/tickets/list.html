@@ -1,0 +1,85 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="flex-between mb-1">
+    <h1>Tickets</h1>
+</div>
+<div class="card" style="padding:.4rem .5rem;margin-bottom:.5rem;">
+    <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="search" placeholder="Buscar..." oninput="aplicarFiltros()" style="flex:1;min-width:120px;font-size:.75rem;padding:.3rem .5rem;">
+        <select id="filtro-estado" onchange="aplicarFiltros()" style="width:auto;font-size:.7rem;padding:.25rem .4rem;">
+            <option value="">Todos</option>
+            <option value="abierto">Abierto</option>
+            <option value="pagado">Pagado</option>
+            <option value="cancelado">Cancelado</option>
+            <option value="credito">Crédito</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.7rem;white-space:nowrap;color:var(--text2);">
+            <input type="checkbox" id="filtro-adeudos" onchange="aplicarFiltros()" style="width:auto;"> Adeudos
+        </label>
+        <button class="btn btn-outline btn-sm" onclick="limpiarFiltros()" style="font-size:.7rem;padding:.25rem .5rem;">Limpiar</button>
+    </div>
+</div>
+<style>
+#tickets-list td{padding:.25rem .35rem;white-space:nowrap;font-size:.72rem;}
+#tickets-list th{padding:.3rem .35rem;font-size:.65rem;white-space:nowrap;}
+</style>
+<div class="card" style="overflow-x:auto;padding:.5rem;">
+    <table style="width:100%;">
+        <thead>
+            <tr>
+                <th>Folio</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Local</th>
+                <th>Total</th>
+                <th>Adeudo</th>
+                <th>Art.</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody id="tickets-list"></tbody>
+    </table>
+</div>
+<script>
+function aplicarFiltros(){
+    var q = document.getElementById('search').value;
+    var estado = document.getElementById('filtro-estado').value;
+    var soloAdeudos = document.getElementById('filtro-adeudos').checked ? '1' : '';
+    var params = new URLSearchParams();
+    if(q) params.set('q', q);
+    if(estado) params.set('estado', estado);
+    if(soloAdeudos) params.set('solo_adeudos', soloAdeudos);
+    fetch('/api/tickets?'+params.toString()).then(r=>r.json()).then(ts=>{
+        var tbody = document.getElementById('tickets-list');
+        if(ts.length===0){ tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sin tickets</td></tr>'; return; }
+        tbody.innerHTML = ts.map(function(t){
+            var esCredito = t.forma_pago==='c' && t.esta_cancelado!=='t';
+            var estadoTxt = t.esta_cancelado==='t' ? 'Cancelado' : (t.esta_abierto==='t' ? 'Abierto' : (esCredito ? 'Crédito' : 'Pagado'));
+            var estadoCls = t.esta_cancelado==='t' ? 'text-muted' : (t.esta_abierto==='t' ? 'text-warning' : (esCredito ? 'text-danger' : 'text-success'));
+            var pagado = t.pago_con || 0;
+            var adeudo = esCredito ? Math.max(0, t.total - pagado) : 0;
+            var fecha = t.creado_en||'';
+            var fp = fecha.split(/[- :]/);
+            var fDisplay = fp.length>=5 ? String(fp[2]).padStart(2,'0')+'|'+String(fp[1]).padStart(2,'0')+'|'+String(fp[3]).padStart(2,'0')+':'+String(fp[4]).padStart(2,'0') : fecha;
+            return '<tr style="cursor:pointer;" onclick="window.location=\'/tickets/'+t.id+'\'">'+
+                '<td>'+(t.folio||'-')+'</td>'+
+                '<td>'+fDisplay+'</td>'+
+                '<td>'+(t.cliente_nombre||'-')+'</td>'+
+                '<td>'+(t.cliente_direccion||'-')+'</td>'+
+                '<td>$'+t.total.toFixed(2)+'</td>'+
+                '<td class="'+(adeudo>0?'text-danger':'text-success')+'">$'+adeudo.toFixed(2)+'</td>'+
+                '<td>'+(t.numero_articulos||0)+'</td>'+
+                '<td class="'+estadoCls+'">'+estadoTxt+'</td>'+
+            '</tr>';
+        }).join('');
+    });
+}
+function limpiarFiltros(){
+    document.getElementById('search').value = '';
+    document.getElementById('filtro-estado').value = '';
+    document.getElementById('filtro-adeudos').checked = false;
+    aplicarFiltros();
+}
+aplicarFiltros();
+</script>
+{{end}}

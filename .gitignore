@@ -1,0 +1,10 @@
+*.db
+pos_server
+pos_server.gz
+pos-server
+*.gz
+*.db
+*.db.bak
+pos/abarrotes.db
+pos/pos.db
+pos/pos.db.bak

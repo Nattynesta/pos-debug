@@ -1,0 +1,89 @@
+{{template "base.html" .}}
+{{define "content"}}
+<style>
+.dept-row { display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem; border-bottom:1px solid #f3f4f6; }
+.dept-row input { width:60px; padding:.3rem; border:1px solid #d1d5db; border-radius:4px; text-align:center; }
+.dept-row .dept-name { flex:1; font-weight:500; }
+.dept-row .dept-id { color:#9ca3af; font-size:.8rem; width:60px; }
+.dept-row .dept-actions { display:flex; gap:.4rem; }
+.dept-form { display:flex; gap:.75rem; padding:1rem; background:#f9fafb; border-radius:8px; margin-bottom:1rem; flex-wrap:wrap; align-items:center; }
+.dept-form input, .dept-form select { padding:.4rem .75rem; border:1px solid #d1d5db; border-radius:6px; font-size:.9rem; }
+.dept-form input[name="nombre"] { flex:1; min-width:200px; }
+.dept-form input[name="orden"] { width:80px; }
+</style>
+
+<div class="dept-form">
+  <input type="text" name="nombre" id="new-dept-nombre" placeholder="Nombre del departamento">
+  <input type="number" name="orden" id="new-dept-orden" placeholder="Orden" value="999" min="0">
+  <select id="new-dept-activo">
+    <option value="t">Activo</option>
+    <option value="f">Inactivo</option>
+  </select>
+  <button class="btn btn-success" onclick="crearDept()">Crear</button>
+</div>
+
+<div id="dept-list"></div>
+
+<script>
+fetch('/api/departamentos').then(r=>r.json()).then(ds=>{
+  departamentos = ds;
+  renderDeptList(ds);
+});
+
+function renderDeptList(list){
+  var html = list.map(function(d){
+    return '<div class="dept-row" data-id="'+d.id+'">'+
+      '<span class="dept-id">#'+d.id+'</span>'+
+      '<input type="number" value="'+(d.orden||999)+'" min="0" onchange="updateOrden(this,'+d.id+')" title="Orden">'+
+      '<span class="dept-name">'+d.nombre+'</span>'+
+      '<span class="badge '+(d.activo==='t'?'badge-success':'badge-outline')+'" style="font-size:.7rem;">'+(d.activo==='t'?'Activo':'Inactivo')+'</span>'+
+      '<div class="dept-actions">'+
+        '<button class="btn btn-sm btn-outline" onclick="toggleActivo('+d.id+',\''+d.activo+'\')">'+(d.activo==='t'?'Desactivar':'Activar')+'</button>'+
+        '<button class="btn btn-sm btn-danger" onclick="eliminarDept('+d.id+')">Eliminar</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('dept-list').innerHTML = html || '<div class="empty-grid">Sin departamentos</div>';
+}
+
+function crearDept(){
+  var n = document.getElementById('new-dept-nombre').value.trim();
+  var o = parseInt(document.getElementById('new-dept-orden').value) || 999;
+  var a = document.getElementById('new-dept-activo').value;
+  if(!n){ alert('Nombre requerido'); return; }
+  fetch('/api/departamentos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n,orden:o,activo:a})})
+    .then(r=>r.json()).then(res=>{
+      if(res.ok){
+        document.getElementById('new-dept-nombre').value='';
+        fetch('/api/departamentos').then(r=>r.json()).then(renderDeptList);
+      }else alert('Error: '+(res.error||'desconocido'));
+    });
+}
+
+function updateOrden(el,id){
+  var o = parseInt(el.value) || 999;
+  fetch('/api/departamentos/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({orden:o})})
+    .then(r=>r.json()).then(res=>{
+      if(!res.ok){ alert('Error'); el.value = el.defaultValue; }
+    });
+}
+
+function toggleActivo(id,actual){
+  var n = actual==='t'?'f':'t';
+  fetch('/api/departamentos/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({activo:n})})
+    .then(r=>r.json()).then(res=>{
+      if(res.ok) fetch('/api/departamentos').then(r=>r.json()).then(renderDeptList);
+      else alert('Error');
+    });
+}
+
+function eliminarDept(id){
+  if(!confirm('Eliminar departamento?')) return;
+  fetch('/api/departamentos/'+id,{method:'DELETE'})
+    .then(r=>r.json()).then(res=>{
+      if(res.ok) fetch('/api/departamentos').then(r=>r.json()).then(renderDeptList);
+      else alert('Error');
+    });
+}
+</script>
+{{end}}

@@ -1,0 +1,232 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="card" style="max-width:800px">
+    <div class="flex-between mb-1">
+        <h2>Ticket <span id="td-folio"></span></h2>
+        <div>
+            <span class="btn btn-sm" id="td-estado"></span>
+        </div>
+    </div>
+    <div class="grid grid-2 mb-1">
+        <div><strong>Fecha:</strong> <span id="td-fecha"></span></div>
+        <div><strong>Cliente:</strong> <span id="td-cliente"></span></div>
+        <div><strong>Local:</strong> <span id="td-local"></span></div>
+        <div><strong>Cajero:</strong> <span id="td-cajero"></span></div>
+        <div id="td-cobro-row" style="display:none;"><strong>Cobrado por:</strong> <span id="td-cobrador"></span></div>
+    </div>
+    <table>
+        <thead><tr><th>Producto</th><th>Cant</th><th>Precio</th><th>Total</th></tr></thead>
+        <tbody id="td-articulos"></tbody>
+        <tfoot>
+            <tr><td colspan="3" class="text-right"><strong>Subtotal</strong></td><td id="td-subtotal"></td></tr>
+            <tr><td colspan="3" class="text-right"><strong>Impuestos</strong></td><td id="td-impuestos"></td></tr>
+            <tr><td colspan="3" class="text-right"><strong>Total</strong></td><td id="td-total"></td></tr>
+            <tr><td colspan="3" class="text-right"><strong>Pago con</strong></td><td id="td-pago"></td></tr>
+            <tr><td colspan="3" class="text-right"><strong>Cambio</strong></td><td id="td-cambio"></td></tr>
+            <tr><td colspan="3" class="text-right"><strong>Adeudo</strong></td><td id="td-adeudo" class="text-danger"></td></tr>
+        </tfoot>
+    </table>
+    <div class="flex mt-1 flex-wrap gap-1">
+        <a href="/tickets" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Volver</a>
+        <button class="btn btn-warning" id="btn-cobrar" onclick="abrirCobroModal()" style="display:none"><i class="fas fa-money-bill-wave"></i> Cobrar Adeudo</button>
+        <button class="btn btn-danger" id="btn-borrar" onclick="borrarTicket()" style="display:none"><i class="fas fa-trash"></i> Borrar</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="cobro-modal" style="display:none;">
+    <div class="modal" style="min-width:420px;max-width:460px;">
+        <h2 style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;"><i class="fas fa-money-bill-wave" style="color:var(--warning);"></i> Cobrar Ticket <span id="cm-folio" style="color:var(--text3);font-weight:400;"></span></h2>
+        <div id="cm-cliente" style="font-size:.85rem;color:var(--text2);margin-bottom:1.2rem;"></div>
+
+        <div style="background:var(--bg3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.85rem;color:var(--text2);font-weight:500;">Total a cobrar</span>
+            <span style="font-size:1.6rem;font-weight:800;color:var(--text);" id="cm-total">$0.00</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom:.4rem;">
+            <label style="display:flex;justify-content:space-between;">
+                <span>Recibido</span>
+                <span id="cm-faltante" style="color:var(--danger);font-weight:600;display:none;"></span>
+            </label>
+            <input type="number" id="cm-recibido" step="0.01" min="0" placeholder="$0.00" autofocus
+                oninput="calcularCambio()" onkeydown="if(event.key==='Enter')confirmarCobro()"
+                style="font-size:1.3rem;font-weight:700;padding:.6rem .75rem;text-align:right;">
+        </div>
+
+        <div id="cm-cambio-row" style="display:none;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:.6rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.85rem;color:#10b981;font-weight:600;"><i class="fas fa-arrow-left"></i> Cambio</span>
+            <span style="font-size:1.4rem;font-weight:800;color:#10b981;" id="cm-cambio">$0.00</span>
+        </div>
+
+        <div class="form-row" style="margin-bottom:1rem;">
+            <div class="form-group">
+                <label>Forma de pago</label>
+                <select id="cm-forma-pago" style="font-size:.9rem;">
+                    <option value="e">Efectivo</option>
+                    <option value="t">Tarjeta</option>
+                    <option value="c">Crédito</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Referencia <span style="color:var(--text3);font-weight:400;">(opcional)</span></label>
+                <input type="text" id="cm-referencia" placeholder="Ej: VISA ****1234" style="font-size:.9rem;">
+            </div>
+        </div>
+
+        <div class="flex-between" style="gap:.5rem;">
+            <button class="btn btn-outline" onclick="cerrarCobroModal()" style="flex:1;"><i class="fas fa-times"></i> Cancelar</button>
+            <button class="btn btn-success" id="cm-confirmar" onclick="confirmarCobro()" style="flex:2;font-size:1rem;padding:.65rem;" disabled><i class="fas fa-check"></i> Confirmar Pago</button>
+        </div>
+    </div>
+</div>
+<script>
+var ticketId = '{{.Data}}';
+var userRole = '{{.Role}}';
+fetch('/api/tickets/'+ticketId).then(r=>r.json()).then(function(t){
+    document.getElementById('td-folio').textContent = t.folio || t.id;
+    var f = t.creado_en||'', fp = f.split(/[- :]/);
+    document.getElementById('td-fecha').textContent = fp.length>=5 ? String(fp[2]).padStart(2,'0')+'|'+String(fp[1]).padStart(2,'0')+'|'+String(fp[3]).padStart(2,'0')+':'+String(fp[4]).padStart(2,'0') : f;
+    document.getElementById('td-cliente').textContent = t.cliente_nombre || '-';
+    document.getElementById('td-local').textContent = t.cliente_direccion || '-';
+    document.getElementById('td-cajero').textContent = t.cajero_nombre || (t.cajero_id||'-');
+    var estado = document.getElementById('td-estado');
+    var esCredito = t.forma_pago==='c' && t.esta_cancelado!=='t';
+    if(t.esta_cancelado==='t'){ estado.textContent='Cancelado'; estado.className='btn btn-sm btn-danger'; }
+    else if(t.esta_abierto==='t'){ estado.textContent='Abierto'; estado.className='btn btn-sm btn-warning'; }
+    else if(esCredito){ estado.textContent='Crédito'; estado.className='btn btn-sm btn-danger'; }
+    else { estado.textContent='Pagado'; estado.className='btn btn-sm btn-success'; }
+    document.getElementById('td-subtotal').textContent = '$'+t.subtotal.toFixed(2);
+    document.getElementById('td-impuestos').textContent = '$'+t.impuestos.toFixed(2);
+    document.getElementById('td-total').textContent = '$'+t.total.toFixed(2);
+    document.getElementById('td-pago').textContent = '$'+(t.pago_con||0).toFixed(2);
+    document.getElementById('td-cambio').textContent = '$'+(t.total_devuelto||0).toFixed(2);
+    var esCreditoDet = t.forma_pago==='c' && t.esta_cancelado!=='t';
+    var adeudo = esCreditoDet ? Math.max(0, t.total - (t.pago_con||0)) : 0;
+    document.getElementById('td-adeudo').textContent = '$'+adeudo.toFixed(2);
+    var tbody = document.getElementById('td-articulos');
+    if(t.articulos && t.articulos.length){
+        tbody.innerHTML = t.articulos.map(function(a){
+            return '<tr><td>'+a.producto_nombre+'</td><td>'+a.cantidad+'</td><td>$'+a.precio_usado.toFixed(2)+'</td><td>$'+(a.cantidad*a.precio_usado).toFixed(2)+'</td></tr>';
+        }).join('');
+    }
+    // Mostrar botones según estado
+    var btnCobrar = document.getElementById('btn-cobrar');
+    var btnBorrar = document.getElementById('btn-borrar');
+    var cobroRow = document.getElementById('td-cobro-row');
+    if(t.esta_cancelado!=='t' && (t.esta_abierto==='t' || esCredito)){
+        btnCobrar.style.display = 'inline-flex';
+        if(!t.esta_abierto && esCredito && t.pagado_en){
+            cobroRow.style.display = 'flex';
+            document.getElementById('td-cobrador').textContent = t.cajero_nombre || t.cajero_id || '-';
+        }
+    } else {
+        if(t.pagado_en && !esCredito){
+            cobroRow.style.display = 'flex';
+            document.getElementById('td-cobrador').textContent = t.cajero_nombre || t.cajero_id || '-';
+        }
+    }
+    if(userRole === 'admin'){
+        btnBorrar.style.display = 'inline-flex';
+    }
+});
+
+function abrirCobroModal(){
+    var total = parseFloat(document.getElementById('td-total').textContent.replace('$','')) || 0;
+    var folio = document.getElementById('td-folio').textContent;
+    var cliente = document.getElementById('td-cliente').textContent;
+    var local = document.getElementById('td-local').textContent;
+    
+    document.getElementById('cm-folio').textContent = '#'+folio;
+    document.getElementById('cm-total').textContent = '$'+total.toFixed(2);
+    document.getElementById('cm-cliente').textContent = cliente + (local && local!='-' ? ' · '+local : '');
+    
+    document.getElementById('cm-recibido').value = '';
+    document.getElementById('cm-cambio-row').style.display = 'none';
+    document.getElementById('cm-faltante').style.display = 'none';
+    document.getElementById('cm-confirmar').disabled = true;
+    document.getElementById('cm-forma-pago').value = 'e';
+    document.getElementById('cm-referencia').value = '';
+    
+    document.getElementById('cobro-modal').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('cm-recibido').focus(); }, 100);
+}
+
+function cerrarCobroModal(){
+    document.getElementById('cobro-modal').style.display = 'none';
+}
+
+function calcularCambio(){
+    var total = parseFloat(document.getElementById('td-total').textContent.replace('$','')) || 0;
+    var recibido = parseFloat(document.getElementById('cm-recibido').value) || 0;
+    var cambioRow = document.getElementById('cm-cambio-row');
+    var faltante = document.getElementById('cm-faltante');
+    var btnConfirm = document.getElementById('cm-confirmar');
+    var forma = document.getElementById('cm-forma-pago').value;
+    
+    if(forma === 't' || forma === 'c'){
+        // Tarjeta o Crédito: no requiere monto recibido
+        recibido = total;
+        cambioRow.style.display = 'none';
+        faltante.style.display = 'none';
+        btnConfirm.disabled = false;
+        return;
+    }
+    
+    if(recibido >= total){
+        var cambio = recibido - total;
+        document.getElementById('cm-cambio').textContent = '$'+cambio.toFixed(2);
+        cambioRow.style.display = 'flex';
+        faltante.style.display = 'none';
+        btnConfirm.disabled = false;
+    } else {
+        var falta = total - recibido;
+        document.getElementById('cm-faltante').textContent = 'Falta $'+falta.toFixed(2);
+        cambioRow.style.display = 'none';
+        faltante.style.display = 'inline';
+        btnConfirm.disabled = true;
+    }
+}
+
+function confirmarCobro(){
+    var btn = document.getElementById('cm-confirmar');
+    if(btn.disabled) return;
+    
+    var total = parseFloat(document.getElementById('td-total').textContent.replace('$','')) || 0;
+    var forma = document.getElementById('cm-forma-pago').value;
+    var recibido = forma === 'e' ? (parseFloat(document.getElementById('cm-recibido').value) || 0) : total;
+    var referencia = document.getElementById('cm-referencia').value.trim();
+    
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    
+    fetch('/api/tickets/'+ticketId+'/cobrar', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({pago_con: recibido, forma_pago: forma, referencia: referencia || null})
+    }).then(r=>r.json()).then(function(res){
+        if(res.ok){
+            cerrarCobroModal();
+            location.reload();
+        } else {
+            alert('Error: ' + (res.error || 'desconocido'));
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Confirmar Pago';
+        }
+    });
+}
+
+function borrarTicket(){
+    if(!confirm('BORRAR PERMANENTEMENTE este ticket y sus artículos? Esta acción no se puede deshacer.')) return;
+    fetch('/api/tickets/'+ticketId, {method:'DELETE'})
+    .then(r=>r.json()).then(function(res){
+        if(res.ok){
+            window.location = '/tickets';
+        } else {
+            alert('Error: ' + (res.error || 'desconocido'));
+        }
+    });
+}
+
+document.getElementById('cobro-modal').addEventListener('click', function(e){
+    if(e.target === this) cerrarCobroModal();
+});
+</script>
+{{end}}

@@ -1,0 +1,184 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="flex-between mb-1">
+    <h1>Proveedores</h1>
+    <button class="btn btn-primary" onclick="mostrarFormProveedor()"><i class="fas fa-plus"></i> Nuevo</button>
+</div>
+<div class="card">
+    <table>
+        <thead><tr><th>#</th><th>Nombre</th><th>Direccion</th><th>Telefonos</th><th>Productos</th><th>Acciones</th></tr></thead>
+        <tbody id="prov-list"></tbody>
+    </table>
+</div>
+<div id="provModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)cerrarModal()">
+    <div class="modal">
+        <h2 id="provModalTitle">Nuevo Proveedor</h2>
+        <form onsubmit="return saveProv(event)">
+            <input type="hidden" id="provId">
+            <div class="form-group"><label>Nombre</label><input type="text" id="provNombre" required></div>
+            <div class="form-group"><label>Direccion</label><input type="text" id="provDireccion"></div>
+            <div class="form-group"><label>Telefonos</label><input type="text" id="provTelefonos"></div>
+            <div class="flex"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button> <button type="button" class="btn btn-outline" onclick="cerrarModal()"><i class="fas fa-times"></i> Cancelar</button></div>
+        </form>
+    </div>
+</div>
+<div id="prodModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)cerrarProdModal()">
+    <div class="modal" style="min-width:600px;">
+        <h2 id="prodModalTitle">Productos</h2>
+        <div id="prod-list" style="max-height:300px;overflow-y:auto;"></div>
+        <div class="flex mt-1"><button type="button" class="btn btn-outline" onclick="cerrarProdModal()"><i class="fas fa-times"></i> Cerrar</button></div>
+    </div>
+</div>
+<div id="recibirModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)cerrarRecibir()">
+    <div class="modal" style="min-width:650px;">
+        <h2 id="recibirTitle">Recibir Surtido</h2>
+        <div class="form-group"><label>Buscar producto</label>
+            <input type="text" id="recibirSearch" placeholder="Escribe nombre o codigo..." oninput="filtrarRecibir()">
+        </div>
+        <div style="max-height:350px;overflow-y:auto;">
+            <table><thead><tr><th>Producto</th><th>Stock actual</th><th>Cant recibir</th><th>Nuevo costo</th></tr></thead>
+            <tbody id="recibir-list"></tbody></table>
+        </div>
+        <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+            <input type="text" id="nuevoCodigo" placeholder="Codigo nuevo producto" style="width:160px;">
+            <input type="text" id="nuevoNombre" placeholder="Nombre" style="flex:1;">
+            <input type="number" id="nuevoCant" placeholder="Cant" style="width:80px;" step="0.01">
+            <button class="btn btn-sm btn-outline" onclick="agregarProdNuevo()"><i class="fas fa-plus"></i> Agregar</button>
+        </div>
+        <div class="flex mt-1">
+            <button class="btn btn-success" onclick="confirmarRecibir()"><i class="fas fa-check"></i> Confirmar Surtido</button>
+            <button type="button" class="btn btn-outline" onclick="cerrarRecibir()"><i class="fas fa-times"></i> Cancelar</button>
+        </div>
+    </div>
+</div>
+<script>
+var proveedores = [], recibirProvNum, recibirItems = [], allProductos = [];
+
+function loadProveedores(){
+    fetch('/api/proveedores').then(r=>r.json()).then(ps=>{
+        proveedores = ps;
+        var tbody = document.getElementById('prov-list');
+        if(ps.length===0){ tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin proveedores</td></tr>'; return; }
+        tbody.innerHTML = ps.map(function(p){
+            return '<tr><td>'+p.num+'</td><td>'+p.nombre+'</td><td>'+(p.direccion||'')+'</td><td>'+(p.telefonos||'')+'</td>' +
+                '<td><button class="btn btn-sm btn-outline" onclick="verProductos('+p.num+')"><i class="fas fa-box"></i> Ver</button></td>' +
+                '<td><button class="btn btn-sm btn-outline" onclick="editarProv('+p.num+')">Editar</button> ' +
+                '<button class="btn btn-sm btn-success" onclick="abrirRecibir('+p.num+')"><i class="fas fa-truck"></i> Recibir</button></td></tr>';
+        }).join('');
+    });
+}
+function verProductos(num){
+    fetch('/api/proveedores/'+num+'/productos').then(r=>r.json()).then(ps=>{
+        var div = document.getElementById('prod-list');
+        if(ps.length===0){
+            div.innerHTML = '<div class="text-muted text-center" style="padding:2rem;">Sin productos asociados</div>';
+        } else {
+            div.innerHTML = '<table><thead><tr><th>Codigo</th><th>Descripcion</th><th>Precio</th><th>Stock</th></tr></thead><tbody>' +
+                ps.map(function(p){ return '<tr><td>'+p.codigo+'</td><td>'+p.descripcion+'</td><td>$'+p.pventa.toFixed(2)+'</td><td>'+p.stock+'</td></tr>'; }).join('') +
+                '</tbody></table>';
+        }
+        document.getElementById('prodModalTitle').textContent = 'Productos - Proveedor #'+num;
+        document.getElementById('prodModal').style.display = 'flex';
+    });
+}
+function cerrarProdModal(){ document.getElementById('prodModal').style.display = 'none'; }
+function abrirRecibir(num){
+    recibirProvNum = num;
+    var prov = proveedores.find(function(p){return p.num===num;});
+    document.getElementById('recibirTitle').textContent = 'Recibir Surtido - '+(prov?prov.nombre:'#'+num);
+    fetch('/api/productos').then(function(r){return r.json();}).then(function(ps){
+        allProductos = ps;
+        // Pre-load existing products from this provider
+        fetch('/api/proveedores/'+num+'/productos').then(function(r){return r.json();}).then(function(existing){
+            recibirItems = existing.map(function(p){ return {codigo:p.codigo, nombre:p.descripcion, stock:p.stock, cantidad:0, pcosto:0}; });
+            renderRecibirList();
+            document.getElementById('recibirModal').style.display = 'flex';
+        });
+    });
+}
+function renderRecibirList(){
+    var tbody = document.getElementById('recibir-list');
+    if(recibirItems.length===0){
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">Sin productos. Agrega uno abajo.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = recibirItems.map(function(it,i){
+        return '<tr>' +
+            '<td>'+it.nombre+' <small style="color:var(--text3)">('+it.codigo+')</small></td>' +
+            '<td>'+it.stock+'</td>' +
+            '<td><input type="number" step="0.01" min="0" value="'+it.cantidad+'" style="width:80px;" onchange="recibirItems['+i+'].cantidad=parseFloat(this.value)||0"></td>' +
+            '<td><input type="number" step="0.01" min="0" value="'+(it.pcosto||'')+'" style="width:90px;" placeholder="costo" onchange="recibirItems['+i+'].pcosto=parseFloat(this.value)||0"></td>' +
+            '</tr>';
+    }).join('');
+}
+function filtrarRecibir(){
+    var q = document.getElementById('recibirSearch').value.toLowerCase();
+    if(!q){ renderRecibirList(); return; }
+    var filtrados = allProductos.filter(function(p){ return (p.codigo||'').toLowerCase().includes(q) || (p.descripcion||'').toLowerCase().includes(q); });
+    // Show as overlay: add any filtered products to recibirItems
+    filtrados.forEach(function(fp){
+        if(!recibirItems.find(function(ri){return ri.codigo===fp.codigo;})){
+            recibirItems.push({codigo:fp.codigo, nombre:fp.descripcion, stock:fp.dinventario||0, cantidad:0, pcosto:0});
+        }
+    });
+    renderRecibirList();
+}
+function agregarProdNuevo(){
+    var cod = document.getElementById('nuevoCodigo').value.trim();
+    var nom = document.getElementById('nuevoNombre').value.trim();
+    var cant = parseFloat(document.getElementById('nuevoCant').value)||0;
+    if(!cod || !nom){ alert('Codigo y nombre requeridos'); return; }
+    if(cant<=0){ alert('Cantidad debe ser mayor a 0'); return; }
+    if(!recibirItems.find(function(ri){return ri.codigo===cod;})){
+        recibirItems.push({codigo:cod, nombre:nom, stock:0, cantidad:cant, pcosto:0, esNuevo:true});
+        document.getElementById('nuevoCodigo').value = '';
+        document.getElementById('nuevoNombre').value = '';
+        document.getElementById('nuevoCant').value = '';
+        renderRecibirList();
+    } else {
+        alert('Producto ya esta en la lista');
+    }
+}
+function confirmarRecibir(){
+    var items = recibirItems.filter(function(it){ return it.cantidad > 0; });
+    if(items.length===0){ alert('Agrega al menos un producto con cantidad > 0'); return; }
+    if(!confirm('Confirmar recepcion de '+items.length+' producto(s)?')) return;
+    fetch('/api/proveedores/'+recibirProvNum+'/recibir', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({productos: items.map(function(it){ return {codigo:it.codigo, cantidad:it.cantidad, pcosto:it.pcosto}; })})
+    }).then(function(r){
+        if(r.ok){
+            alert('Stock actualizado correctamente');
+            cerrarRecibir();
+            loadProveedores();
+        } else {
+            r.json().then(function(d){ alert('Error: '+d.error); });
+        }
+    });
+}
+function cerrarRecibir(){ document.getElementById('recibirModal').style.display = 'none'; recibirItems = []; }
+function mostrarFormProveedor(){ document.getElementById('provModal').style.display='flex'; document.getElementById('provModalTitle').textContent='Nuevo Proveedor'; document.getElementById('provId').value=''; document.getElementById('provNombre').value=''; document.getElementById('provDireccion').value=''; document.getElementById('provTelefonos').value=''; }
+function cerrarModal(){ document.getElementById('provModal').style.display='none'; }
+function editarProv(num){
+    fetch('/api/proveedores/'+num).then(r=>r.json()).then(function(p){
+        document.getElementById('provModal').style.display='flex';
+        document.getElementById('provModalTitle').textContent='Editar Proveedor';
+        document.getElementById('provId').value=p.num;
+        document.getElementById('provNombre').value=p.nombre;
+        document.getElementById('provDireccion').value=p.direccion;
+        document.getElementById('provTelefonos').value=p.telefonos;
+    });
+}
+function saveProv(e){
+    e.preventDefault();
+    var id = document.getElementById('provId').value;
+    var data = {nombre: document.getElementById('provNombre').value, direccion: document.getElementById('provDireccion').value, telefonos: document.getElementById('provTelefonos').value};
+    var url = id ? '/api/proveedores/'+id : '/api/proveedores';
+    var method = id ? 'PUT' : 'POST';
+    fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(function(r){ if(r.ok){ cerrarModal(); loadProveedores(); } else r.json().then(function(d){ alert('Error: '+d.error); }); });
+    return false;
+}
+loadProveedores();
+</script>
+{{end}}

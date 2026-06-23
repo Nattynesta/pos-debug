@@ -1,0 +1,50 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="grid grid-2 mb-1">
+    <div class="card stat"><div class="value" id="ventasHoy">{{.Data.VentasHoy}}</div><div class="label">Ventas Hoy</div></div>
+    <div class="card stat"><div class="value" id="ingresosHoy">${{printf "%.2f" .Data.IngresosHoy}}</div><div class="label">Ingresos Hoy</div></div>
+    <div class="card stat"><div class="value" id="gananciaHoy">${{printf "%.2f" .Data.GananciaHoy}}</div><div class="label">Ganancia Hoy</div></div>
+    <div class="card stat"><div class="value" id="productosStock">{{.Data.ProductosStock}}</div><div class="label">Productos con Stock</div></div>
+    <div class="card stat" onclick="mostrarValorInventario()" style="cursor:pointer"><div class="value" id="valorInventario">******</div><div class="label">Valor Inventario <small style="color:var(--text3)">(click)</small></div></div>
+    <div class="card stat">
+        <div class="value">{{if .Data.OperacionActiva}}Abierta{{else}}Cerrada{{end}}</div>
+        <div class="label">Caja</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="flex-between mb-1">
+        <h2>Ventas del Dia</h2>
+        <a href="/ventas/pos" class="btn btn-success"><i class="fas fa-plus"></i> Nueva Venta</a>
+    </div>
+    <table>
+        <thead><tr><th>Ticket</th><th>Total</th><th>Hora</th><th>Estado</th></tr></thead>
+        <tbody id="tickets-today">
+            <tr><td colspan="4" class="text-center text-muted">Cargando...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+var viTimer;
+function mostrarValorInventario(){
+  var el = document.getElementById('valorInventario');
+  el.textContent = '${{printf "%.2f" .Data.ValorInventario}}';
+  clearTimeout(viTimer);
+  viTimer = setTimeout(function(){ el.textContent = '******'; }, 5000);
+}
+fetch('/api/tickets').then(r=>r.json()).then(ts=>{
+    var hoy = new Date().toISOString().slice(0,10);
+    var filtrados = ts.filter(function(t){ return t.creado_en && t.creado_en.slice(0,10) === hoy; });
+    var tbody = document.getElementById('tickets-today');
+    if(filtrados.length===0){
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sin ventas hoy</td></tr>';
+    } else {
+        tbody.innerHTML = filtrados.slice(0,10).map(function(t){
+            var estado = t.esta_cancelado === 't' ? 'Cancelado' : (t.esta_abierto === 't' ? 'Abierto' : 'Pagado');
+            return '<tr><td><a href="/tickets/'+t.id+'">#'+(t.folio||t.id)+'</a></td><td>$'+t.total.toFixed(2)+'</td><td>'+(t.creado_en||'').slice(11,19)+'</td><td>'+estado+'</td></tr>';
+        }).join('');
+    }
+});
+</script>
+{{end}}

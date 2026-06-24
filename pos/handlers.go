@@ -1883,9 +1883,9 @@ func handleChatMensajes(w http.ResponseWriter, r *http.Request) {
 		var rows *sql.Rows
 		var err error
 		if beforeID != "" {
-			rows, err = db.Query(`SELECT cm.id, cm.usuario_id, cm.mensaje, cm.created_on, u.usuario FROM CHAT_MESSAGES cm JOIN USUARIOS u ON u.id=cm.usuario_id WHERE cm.id < ? ORDER BY cm.created_on DESC LIMIT ?`, beforeID, limit)
+			rows, err = db.Query(`SELECT cm.id, cm.usuario_id, cm.mensaje, cm.created_on, u.usuario FROM CHAT_MESSAGES cm JOIN USUARIOS u ON u.id=cm.usuario_id WHERE cm.id < ? ORDER BY cm.created_on ASC LIMIT ?`, beforeID, limit)
 		} else {
-			rows, err = db.Query(`SELECT cm.id, cm.usuario_id, cm.mensaje, cm.created_on, u.usuario FROM CHAT_MESSAGES cm JOIN USUARIOS u ON u.id=cm.usuario_id ORDER BY cm.created_on DESC LIMIT ?`, limit)
+			rows, err = db.Query(`SELECT cm.id, cm.usuario_id, cm.mensaje, cm.created_on, u.usuario FROM CHAT_MESSAGES cm JOIN USUARIOS u ON u.id=cm.usuario_id ORDER BY cm.created_on ASC LIMIT ?`, limit)
 		}
 		if err != nil { jsonErr(w, err.Error(), 500); return }
 		defer rows.Close()

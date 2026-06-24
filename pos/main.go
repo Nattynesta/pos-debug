@@ -56,20 +56,22 @@ func main() {
 	sub, _ := fs.Sub(templateFS, "templates")
 	baseBytes, _ := fs.ReadFile(sub, "base.html")
 	loginBytes, _ := fs.ReadFile(sub, "login.html")
+	chatBytes, _ := fs.ReadFile(sub, "chat.html")
 	fmap := template.FuncMap{
 		"formatMoney": func(f float64) string { return fmt.Sprintf("$%.2f", f) },
 		"formatTime":  func(s string) string { return s },
 		"yesno":       func(s string) string { if s == "t" { return "Sí" }; return "No" },
 	}
-	// Standalone templates (login.html) in shared set
+	// Standalone templates (login.html, chat.html) in shared set
 	tmpl = template.New("").Funcs(fmap)
 	template.Must(tmpl.New("login.html").Parse(string(loginBytes)))
+	template.Must(tmpl.New("chat.html").Parse(string(chatBytes)))
 	// Page templates: each gets its own namespace to avoid define "content" collision
 	pageTmpls = make(map[string]*template.Template)
 	fs.WalkDir(sub, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil { return err }
 		if d.IsDir() || !strings.HasSuffix(path, ".html") { return nil }
-		if path == "base.html" || path == "login.html" { return nil }
+		if path == "base.html" || path == "login.html" || path == "chat.html" { return nil }
 		b, err := fs.ReadFile(sub, path)
 		if err != nil { return err }
 		combined := `{{define "base.html"}}` + string(baseBytes) + `{{end}}` + string(b)
@@ -177,6 +179,7 @@ func main() {
 	mux.HandleFunc("POST /api/admin/reset-ventas", withAdmin(handleAdminResetVentas))
 	mux.HandleFunc("GET /api/chat/mensajes", handleChatMensajes)
 	mux.HandleFunc("POST /api/chat/mensajes", handleChatMensajes)
+	mux.HandleFunc("GET /api/chat/usuarios", handleChatUsuarios)
 	mux.HandleFunc("GET /api/chat/online", handleChatOnline)
 	mux.HandleFunc("GET /api/chat/ws", handleChatWS)
 

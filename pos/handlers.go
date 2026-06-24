@@ -1633,6 +1633,27 @@ func handleAdminResetVentas(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, map[string]string{"ok": "Ventas, tickets y pedidos reiniciados"})
 }
 
+func handleChatUsuarios(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query("SELECT id, usuario, COALESCE(nombre_completo,'') FROM USUARIOS WHERE activo='t' ORDER BY usuario")
+	if err != nil {
+		jsonErr(w, err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+	type ChatUser struct {
+		ID           int    `json:"id"`
+		Usuario      string `json:"usuario"`
+		NombreCompleto string `json:"nombre_completo"`
+	}
+	us := make([]ChatUser, 0)
+	for rows.Next() {
+		var u ChatUser
+		rows.Scan(&u.ID, &u.Usuario, &u.NombreCompleto)
+		us = append(us, u)
+	}
+	jsonResp(w, us)
+}
+
 func handleChatOnline(w http.ResponseWriter, r *http.Request) {
 	var count int
 	db.QueryRow("SELECT COUNT(*) FROM USUARIOS WHERE activo='t'").Scan(&count)

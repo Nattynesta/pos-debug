@@ -16,7 +16,7 @@ type wsClient struct {
 	conn     *websocket.Conn
 	userID   int
 	username string
-	canalID  int
+	canales  map[int]bool
 	send     chan []byte
 }
 
@@ -56,7 +56,7 @@ func broadcastToChannel(canalID int, msg []byte) {
 	wsClientsMu.Lock()
 	defer wsClientsMu.Unlock()
 	for client := range wsClients {
-		if client.canalID != canalID {
+		if !client.canales[canalID] {
 			continue
 		}
 		select {
@@ -71,16 +71,12 @@ func broadcastToChannel(canalID int, msg []byte) {
 	}
 }
 
-func sendToClient(client *wsClient, msg []byte) {
-	select {
-	case client.send <- msg:
-	default:
-	}
-}
-
 func sendJSON(client *wsClient, v interface{}) {
 	data, _ := json.Marshal(v)
-	sendToClient(client, data)
+	select {
+	case client.send <- data:
+	default:
+	}
 }
 
 func handleChatWS(w http.ResponseWriter, r *http.Request) {
@@ -89,16 +85,9 @@ func handleChatWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	canalID := 1
-	if c := r.URL.Query().Get("canal_id"); c != "" {
-		if v, err := strconv.Atoi(c); err == nil && v > 0 {
-			canalID = v
-		}
-	}
-
 	client := &wsClient{
 		conn:    conn,
-		canalID: canalID,
+		canales: make(map[int]bool),
 		send:    make(chan []byte, 256),
 	}
 
@@ -106,7 +95,7 @@ func handleChatWS(w http.ResponseWriter, r *http.Request) {
 		wsUnregister <- client
 	}()
 
-	conn.SetReadLimit(65536)
+	conn.SetReadLimit(512 * 1024)
 	conn.SetReadDeadline(time.Now().Add(120 * time.Second))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(120 * time.Second))
@@ -172,9 +161,38 @@ func handleChatWS(w http.ResponseWriter, r *http.Request) {
 			db.QueryRow("SELECT usuario FROM USUARIOS WHERE id=?", uid).Scan(&username)
 			client.userID = uid
 			client.username = username
+			client.canales[1] = true
 			authenticated = true
 			authTimer.Stop()
 			sendJSON(client, map[string]string{"type": "ack", "id": msg.ID, "status": "authenticated"})
+
+		case "subscribe":
+			if !authenticated {
+				sendJSON(client, map[string]string{"type": "error", "id": msg.ID, "error": "not_authenticated"})
+				continue
+			}
+			var extra struct {
+				CanalID int `json:"canal_id"`
+			}
+			if msg.Extra != nil {
+				json.Unmarshal(msg.Extra, &extra)
+			}
+			if extra.CanalID > 0 {
+				client.canales[extra.CanalID] = true
+			}
+			sendJSON(client, map[string]string{"type": "ack", "id": msg.ID, "status": "subscribed"})
+
+		case "unsubscribe":
+			if !authenticated {
+				continue
+			}
+			var extra struct {
+				CanalID int `json:"canal_id"`
+			}
+			if msg.Extra != nil {
+				json.Unmarshal(msg.Extra, &extra)
+			}
+			delete(client.canales, extra.CanalID)
 
 		case "chat":
 			if !authenticated {
@@ -185,18 +203,28 @@ func handleChatWS(w http.ResponseWriter, r *http.Request) {
 				sendJSON(client, map[string]string{"type": "error", "id": msg.ID, "error": "empty_message"})
 				continue
 			}
+
 			var extra struct {
-				CanalID int `json:"canal_id"`
+				CanalID int    `json:"canal_id"`
+				Tipo    string `json:"tipo"`
+				Datos   string `json:"datos"`
 			}
+			canalID := 1
+			tipo := "texto"
+			datos := ""
 			if msg.Extra != nil {
 				json.Unmarshal(msg.Extra, &extra)
-			}
-			canalID := extra.CanalID
-			if canalID <= 0 {
-				canalID = client.canalID
+				if extra.CanalID > 0 {
+					canalID = extra.CanalID
+				}
+				if extra.Tipo != "" {
+					tipo = extra.Tipo
+				}
+				datos = extra.Datos
 			}
 
-			_, err := db.Exec("INSERT INTO CHAT_MESSAGES (usuario_id, mensaje, canal_id) VALUES (?,?,?)", client.userID, msg.Payload, canalID)
+			_, err := db.Exec("INSERT INTO CHAT_MESSAGES (usuario_id, mensaje, canal_id, tipo, datos_json) VALUES (?,?,?,?,?)",
+				client.userID, msg.Payload, canalID, tipo, datos)
 			if err != nil {
 				sendJSON(client, map[string]string{"type": "error", "id": msg.ID, "error": "db_error"})
 				continue
@@ -207,14 +235,16 @@ func handleChatWS(w http.ResponseWriter, r *http.Request) {
 			db.QueryRow("SELECT last_insert_rowid()").Scan(&mid)
 
 			broadcast := map[string]interface{}{
-				"type":     "chat",
-				"id":       msg.ID,
-				"msg_id":   mid,
-				"user_id":  client.userID,
-				"username": client.username,
-				"message":  msg.Payload,
-				"created":  created,
-				"canal_id": canalID,
+				"type":      "chat",
+				"id":        msg.ID,
+				"msg_id":    mid,
+				"user_id":   client.userID,
+				"username":  client.username,
+				"message":   msg.Payload,
+				"created":   created,
+				"canal_id":  canalID,
+				"tipo":      tipo,
+				"datos":     datos,
 			}
 			data, _ := json.Marshal(broadcast)
 			broadcastToChannel(canalID, data)
@@ -257,7 +287,6 @@ type Canal struct {
 
 func handleChatCanales(w http.ResponseWriter, r *http.Request) {
 	uid := getUserID(r)
-
 	rows, err := db.Query(`
 		SELECT c.id, c.nombre, c.icono, c.descripcion,
 			COALESCE((SELECT COUNT(*) FROM CHAT_MESSAGES m WHERE m.canal_id = c.id AND m.id > COALESCE(l.ultimo_leido_id, 0)), 0) as no_leidos
@@ -270,7 +299,6 @@ func handleChatCanales(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
-
 	canales := make([]Canal, 0)
 	for rows.Next() {
 		var ca Canal
@@ -343,10 +371,7 @@ func handleChatMensajes(w http.ResponseWriter, r *http.Request) {
 			rows.Scan(&id, &uid, &msg, &created, &usuario, &tipo, &datos)
 			m := map[string]interface{}{
 				"id": id, "user_id": uid, "message": msg, "created": created,
-				"username": usuario, "type": "chat", "canal_id": canalID,
-			}
-			if tipo != "" {
-				m["tipo"] = tipo
+				"username": usuario, "type": "chat", "canal_id": canalID, "tipo": tipo,
 			}
 			if datos != "" {
 				var dj interface{}
@@ -357,7 +382,6 @@ func handleChatMensajes(w http.ResponseWriter, r *http.Request) {
 			msgs = append(msgs, m)
 		}
 
-		// mark as read
 		if len(msgs) > 0 {
 			lastID := 0
 			for _, m := range msgs {
@@ -379,6 +403,8 @@ func handleChatMensajes(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Mensaje string `json:"mensaje"`
 			CanalID int    `json:"canal_id"`
+			Tipo    string `json:"tipo"`
+			Datos   string `json:"datos"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		if strings.TrimSpace(body.Mensaje) == "" {
@@ -388,11 +414,15 @@ func handleChatMensajes(w http.ResponseWriter, r *http.Request) {
 		if body.CanalID <= 0 {
 			body.CanalID = 1
 		}
+		if body.Tipo == "" {
+			body.Tipo = "texto"
+		}
 		if uid <= 0 {
 			jsonErr(w, "No autenticado", 401)
 			return
 		}
-		_, err := db.Exec("INSERT INTO CHAT_MESSAGES (usuario_id, mensaje, canal_id) VALUES (?,?,?)", uid, body.Mensaje, body.CanalID)
+		_, err := db.Exec("INSERT INTO CHAT_MESSAGES (usuario_id, mensaje, canal_id, tipo, datos_json) VALUES (?,?,?,?,?)",
+			uid, body.Mensaje, body.CanalID, body.Tipo, body.Datos)
 		if err != nil {
 			jsonErr(w, err.Error(), 500)
 			return
@@ -407,7 +437,7 @@ func handleChatMensajes(w http.ResponseWriter, r *http.Request) {
 		msgData, _ := json.Marshal(map[string]interface{}{
 			"type": "chat", "id": "", "msg_id": mid, "user_id": uid,
 			"username": usuario, "message": body.Mensaje, "created": msgCreated,
-			"canal_id": body.CanalID,
+			"canal_id": body.CanalID, "tipo": body.Tipo, "datos": body.Datos,
 		})
 		broadcastToChannel(body.CanalID, msgData)
 		jsonResp(w, map[string]string{"ok": "enviado"})

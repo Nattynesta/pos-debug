@@ -144,9 +144,16 @@
 .cs-bottom { padding:.5rem .65rem; border-top:1px solid var(--border); display:flex; gap:.4rem; align-items:flex-end; flex-shrink:0; }
 .cs-bottom textarea { flex:1; resize:none; border:1.5px solid var(--border); border-radius:8px; padding:.45rem .65rem; font-size:.85rem; background:var(--bg3); color:var(--text); font-family:inherit; max-height:100px; min-height:36px; line-height:1.4; }
 .cs-bottom textarea:focus { outline:none; border-color:var(--primary); }
+.btn-voice { width:34px; height:34px; border-radius:8px; border:1.5px solid var(--border); background:var(--bg3); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text3); font-size:1rem; flex-shrink:0; transition:all .1s; }
+.btn-voice:hover { border-color:var(--danger); color:var(--danger); }
 .cs-bottom .cs-send { width:36px; height:36px; border-radius:8px; border:none; background:var(--accent); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; transition:all .1s; }
 .cs-bottom .cs-send:hover { background:var(--primary-dark); }
 .cs-bottom .cs-send:active { transform:scale(.95); }
+
+/* FAB */
+#chat-fab { position:fixed; bottom:20px; right:20px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:white; border:none; font-size:1.4rem; cursor:pointer; box-shadow:0 4px 15px rgba(0,0,0,.2); z-index:999; display:flex; align-items:center; justify-content:center; }
+#chat-fab:active { transform:scale(.95); }
+#chat-fab-badge { position:absolute; top:-3px; right:-3px; min-width:20px; height:20px; border-radius:999px; background:var(--danger); color:white; font-size:.6rem; font-weight:700; align-items:center; justify-content:center; padding:0 .35rem; border:2px solid var(--bg2); display:none; }
 
 .cb { display:flex; gap:.4rem; max-width:92%; margin-bottom:.15rem; }
 .cb-own { align-self:flex-end; flex-direction:row-reverse; }
@@ -159,6 +166,17 @@
 .cb-text { white-space:pre-wrap; }
 .cb-time { font-size:.6rem; opacity:.6; text-align:right; margin-top:.15rem; }
 .cb-own .cb-time { color:rgba(255,255,255,.7); }
+.cb-audio-wrap { max-width:200px; }
+.cb-audio { width:100%; height:32px; border-radius:6px; }
+
+/* Voice recorder bar */
+.voice-recorder { display:none; align-items:center; gap:.5rem; padding:.5rem .65rem; background:#ef4444; color:white; font-size:.85rem; border-top:1px solid var(--border); flex-shrink:0; }
+.voice-recorder.open { display:flex; }
+#voice-timer { font-weight:700; font-size:.9rem; min-width:40px; }
+.vr-btn { background:rgba(255,255,255,.2); border:none; border-radius:6px; padding:.3rem .5rem; color:white; cursor:pointer; font-size:.85rem; }
+.vr-btn:hover { background:rgba(255,255,255,.35); }
+.vr-pulse { width:10px; height:10px; border-radius:50%; background:#fff; animation:vrPulse 1s ease-in-out infinite; }
+@keyframes vrPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.3)} }
 
 @media(max-width:768px) {
   #chat-sidebar { width:100%; top:0; z-index:1000; }
@@ -382,6 +400,8 @@
   </button>
 </div>
 
+<button id="chat-fab" title="Chat (Ctrl+Shift+C)"><i class="ti ti-message"></i><span id="chat-fab-badge"></span></button>
+
 <div id="chat-sidebar">
   <div class="cs-header">
     <h3><i class="ti ti-message"></i> Chat</h3>
@@ -393,9 +413,16 @@
     <div class="cs-msgs" id="chat-mensajes">
       <div class="cs-empty" id="chat-empty"><i class="ti ti-message-off" style="font-size:1.5rem;display:block;margin-bottom:.3rem;"></i>Sin mensajes</div>
     </div>
+    <div class="voice-recorder" id="voice-recorder">
+      <span class="vr-pulse"></span>
+      <span id="voice-timer">0:00</span>
+      <button class="vr-btn" id="btn-cancel-voice"><i class="ti ti-x"></i></button>
+      <button class="vr-btn" id="btn-stop-voice" style="background:rgba(255,255,255,.3);font-weight:600;"><i class="ti ti-check"></i> Enviar</button>
+    </div>
     <div class="cs-bottom" id="chat-bottom">
-      <textarea id="chat-input" placeholder="Escribe un mensaje..." oninput="autoExpandChatInput(this)" rows="1"></textarea>
-      <button class="cs-send" onclick="enviarMensajeChat()"><i class="ti ti-send"></i></button>
+      <button class="btn-voice" id="btn-voice" title="Nota de voz"><i class="ti ti-microphone"></i></button>
+      <textarea id="chat-input" placeholder="Escribe un mensaje..." rows="1"></textarea>
+      <button class="cs-send" id="btn-send"><i class="ti ti-send"></i></button>
     </div>
   </div>
 </div>
@@ -980,6 +1007,5 @@ function ocultarQuickView(){ document.getElementById('qv-modal').classList.remov
 document.getElementById('qv-modal').addEventListener('click',function(e){if(e.target===this)ocultarQuickView();});
 document.getElementById('new-client-modal').addEventListener('click',function(e){if(e.target===this)hideNewClientModal();});
 document.getElementById('confirm-modal').addEventListener('click',function(e){if(e.target===this)cerrarConfirmModal();});
-initChatSidebar('{{.User}}',{{.UserID}},'{{.User}}');
 </script>
 {{end}}

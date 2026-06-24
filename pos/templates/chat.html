@@ -73,18 +73,47 @@ function appendMsg(data){
   cont.scrollTop = cont.scrollHeight;
 }
 
-function cargarMensajes(){
-  fetch('/api/chat/mensajes').then(function(r){return r.json();}).then(function(msgs){
+var loadingOlder = false;
+var hasMore = true;
+var oldestLoadedId = null;
+
+function cargarMensajes(prepend){
+  if(loadingOlder) return;
+  loadingOlder = true;
+  var url = '/api/chat/mensajes?limit=20';
+  if(prepend && oldestLoadedId) url += '&before_id=' + oldestLoadedId;
+  fetch(url).then(function(r){return r.json();}).then(function(msgs){
     var cont = document.getElementById('messages');
     var empty = document.getElementById('empty-msg');
     if(!msgs.length){
-      empty.style.display = 'block'; cont.innerHTML = ''; cont.appendChild(empty); return;
+      if(!prepend){ empty.style.display = 'block'; cont.innerHTML = ''; cont.appendChild(empty); }
+      hasMore = false;
+      loadingOlder = false;
+      return;
     }
     empty.style.display = 'none';
-    cont.innerHTML = msgs.reverse().map(renderMsg).join('');
-    cont.scrollTop = cont.scrollHeight;
-  }).catch(function(){});
+    var html = msgs.reverse().map(renderMsg).join('');
+    if(prepend){
+      var scrollHeightBefore = cont.scrollHeight;
+      cont.insertAdjacentHTML('afterbegin', html);
+      oldestLoadedId = msgs[msgs.length-1].id;
+      cont.scrollTop = cont.scrollHeight - scrollHeightBefore;
+    }else{
+      cont.innerHTML = html;
+      oldestLoadedId = msgs[msgs.length-1].id;
+      cont.scrollTop = cont.scrollHeight;
+    }
+    if(msgs.length < 20) hasMore = false;
+    loadingOlder = false;
+  }).catch(function(){ loadingOlder = false; });
 }
+
+document.getElementById('messages').addEventListener('scroll', function(){
+  var cont = this;
+  if(cont.scrollTop === 0 && hasMore && !loadingOlder){
+    cargarMensajes(true);
+  }
+});
 
 function enviarMensaje(){
   var input = document.getElementById('msg-input');

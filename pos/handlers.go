@@ -1875,7 +1875,18 @@ func handleChatClear(w http.ResponseWriter, r *http.Request) {
 
 func handleChatMensajes(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		rows, err := db.Query(`SELECT cm.id, cm.usuario_id, cm.mensaje, cm.created_on, u.usuario FROM CHAT_MESSAGES cm JOIN USUARIOS u ON u.id=cm.usuario_id ORDER BY cm.created_on DESC LIMIT 100`)
+		limit := 20
+		if l := r.URL.Query().Get("limit"); l != "" {
+			if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 { limit = v }
+		}
+		beforeID := r.URL.Query().Get("before_id")
+		var rows *sql.Rows
+		var err error
+		if beforeID != "" {
+			rows, err = db.Query(`SELECT cm.id, cm.usuario_id, cm.mensaje, cm.created_on, u.usuario FROM CHAT_MESSAGES cm JOIN USUARIOS u ON u.id=cm.usuario_id WHERE cm.id < ? ORDER BY cm.created_on DESC LIMIT ?`, beforeID, limit)
+		} else {
+			rows, err = db.Query(`SELECT cm.id, cm.usuario_id, cm.mensaje, cm.created_on, u.usuario FROM CHAT_MESSAGES cm JOIN USUARIOS u ON u.id=cm.usuario_id ORDER BY cm.created_on DESC LIMIT ?`, limit)
+		}
 		if err != nil { jsonErr(w, err.Error(), 500); return }
 		defer rows.Close()
 		msgs := make([]map[string]interface{}, 0)

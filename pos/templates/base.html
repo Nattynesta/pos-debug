@@ -66,7 +66,7 @@
         ::-webkit-scrollbar{width:6px;}
         ::-webkit-scrollbar-track{background:transparent;}
         ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-        @media(max-width:768px){.form-row{grid-template-columns:1fr;}nav{flex-wrap:wrap;height:auto;padding:.5rem;gap:.35rem;}.hide-mobile{display:none!important;}}
+        @media(max-width:768px){.form-row{grid-template-columns:1fr;}nav{flex-wrap:wrap;height:auto;padding:.5rem;gap:.35rem;}}
     </style>
 </head>
 <body>
@@ -78,7 +78,7 @@
         {{end}}
         <a href="/pedidos" class="{{if eq .Active "pedidos"}}active{{end}}"><i class="fas fa-clipboard-list"></i> Pedidos</a>
         <a href="/chat" class="{{if eq .Active "chat"}}active{{end}}"><i class="fas fa-comment-dots"></i> Chat</a>
-        <a href="/ventas/pos" class="hide-mobile {{if eq .Active "pos"}}active{{end}}"><i class="fas fa-shopping-cart"></i> POS</a>
+        <a href="/ventas/pos" class="{{if eq .Active "pos"}}active{{end}}"><i class="fas fa-shopping-cart"></i> POS</a>
         {{if eq .Role "admin"}}
         <a href="/productos" class="{{if eq .Active "productos"}}active{{end}}"><i class="fas fa-box"></i> Productos</a>
         <a href="/clientes" class="{{if eq .Active "clientes"}}active{{end}}"><i class="fas fa-users"></i> Clientes</a>

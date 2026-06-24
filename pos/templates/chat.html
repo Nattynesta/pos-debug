@@ -1,163 +1,73 @@
 {{template "base.html" .}}
 {{define "content"}}
 <style>
-.chat-layout { display:flex; flex-direction:column; height:calc(100vh - 6rem); }
-.chat-header { margin-bottom:.75rem; padding-bottom:.5rem; border-bottom:1px solid var(--border); }
-.chat-header h2 { margin:0; font-size:1rem; }
-.chat-messages { flex:1; overflow-y:auto; padding:.75rem; background:var(--bg2); border:1.5px solid var(--border); border-radius:var(--radius); margin-bottom:.75rem; display:flex; flex-direction:column; gap:.35rem; }
-.msg { max-width:80%; padding:.45rem .7rem; border-radius:10px; font-size:.85rem; line-height:1.4; word-wrap:break-word; }
-.msg.own { align-self:flex-end; background:var(--accent); color:white; border-bottom-right-radius:3px; }
-.msg.other { align-self:flex-start; background:var(--bg3); color:var(--text); border:1px solid var(--border); border-bottom-left-radius:3px; }
-.msg .meta { display:flex; align-items:center; gap:.3rem; margin-top:.2rem; font-size:.65rem; opacity:.75; }
-.msg.own .meta { justify-content:flex-end; }
-.msg .usr { font-weight:600; }
-.msg .time { white-space:nowrap; }
-.chat-input-wrap { display:flex; gap:.5rem; }
-.chat-input-wrap input { flex:1; padding:.6rem .85rem; border:1.5px solid var(--border); border-radius:var(--radius); background:var(--bg2); color:var(--text); font-size:.9rem; }
-.chat-input-wrap input:focus { outline:none; border-color:var(--accent); }
-.chat-input-wrap button { padding:.6rem 1.2rem; font-size:.9rem; font-weight:600; }
-.chat-empty { text-align:center; color:var(--text3); padding:3rem 1rem; font-size:.85rem; }
-.chat-toolbar { display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem; }
+.chat-full { display:flex; flex-direction:column; height:calc(100vh - 6rem); max-width:600px; margin:0 auto; background:var(--bg2); border:1.5px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+.chat-full .cs-header { display:flex; align-items:center; justify-content:space-between; padding:.65rem 1rem; border-bottom:1px solid var(--border); flex-shrink:0; }
+.chat-full .cs-header h3 { margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:.35rem; }
+.chat-full .cs-canales { flex:0 0 auto; max-height:30%; overflow-y:auto; border-bottom:1px solid var(--border); }
+.chat-full .cs-canales .cc-item { display:flex; align-items:center; gap:.5rem; padding:.5rem .85rem; cursor:pointer; transition:all .1s; border-left:3px solid transparent; }
+.chat-full .cs-canales .cc-item:hover { background:var(--bg3); }
+.chat-full .cs-canales .cc-item.active { background:rgba(8,145,178,.1); border-left-color:var(--primary); }
+.chat-full .cs-canales .cc-item .cc-icon { width:24px; text-align:center; color:var(--text3); font-size:1rem; flex-shrink:0; }
+.chat-full .cs-canales .cc-item .cc-name { flex:1; font-size:.85rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-full .cs-canales .cc-item .cc-badge { min-width:20px; height:20px; border-radius:999px; background:var(--accent); color:white; font-size:.65rem; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 .35rem; }
+.chat-full .cs-conversacion { flex:1; display:flex; flex-direction:column; min-height:0; }
+.chat-full .cs-msgs-header { padding:.45rem .85rem; font-size:.75rem; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:.03em; border-bottom:1px solid var(--border); flex-shrink:0; background:var(--bg3); }
+.chat-full .cs-msgs { flex:1; overflow-y:auto; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.25rem; }
+.chat-full .cs-empty { text-align:center; color:var(--text3); padding:2rem .5rem; font-size:.78rem; flex:1; display:flex; align-items:center; justify-content:center; }
+.chat-full .cs-bottom { padding:.5rem .65rem; border-top:1px solid var(--border); display:flex; gap:.4rem; align-items:flex-end; flex-shrink:0; }
+.chat-full .cs-bottom textarea { flex:1; resize:none; border:1.5px solid var(--border); border-radius:8px; padding:.45rem .65rem; font-size:.85rem; background:var(--bg3); color:var(--text); font-family:inherit; max-height:100px; min-height:36px; line-height:1.4; }
+.chat-full .cs-bottom textarea:focus { outline:none; border-color:var(--primary); }
+.chat-full .cs-bottom .btn-voice { width:34px; height:34px; border-radius:8px; border:1.5px solid var(--border); background:var(--bg3); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text3); font-size:1rem; flex-shrink:0; }
+.chat-full .cs-bottom .btn-voice:hover { border-color:var(--danger); color:var(--danger); }
+.chat-full .cs-bottom .cs-send { width:36px; height:36px; border-radius:8px; border:none; background:var(--accent); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+.chat-full .cs-bottom .cs-send:hover { background:var(--primary-dark); }
+.voice-recorder { display:none; align-items:center; gap:.5rem; padding:.5rem .65rem; background:#ef4444; color:white; font-size:.85rem; border-top:1px solid var(--border); flex-shrink:0; }
+.voice-recorder.open { display:flex; }
+#voice-timer { font-weight:700; font-size:.9rem; min-width:40px; }
+.vr-btn { background:rgba(255,255,255,.2); border:none; border-radius:6px; padding:.3rem .5rem; color:white; cursor:pointer; font-size:.85rem; }
+.vr-btn:hover { background:rgba(255,255,255,.35); }
+.vr-pulse { width:10px; height:10px; border-radius:50%; background:#fff; animation:vrPulse 1s ease-in-out infinite; }
+@keyframes vrPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.3)} }
+.cb { display:flex; gap:.4rem; max-width:92%; margin-bottom:.15rem; }
+.cb-own { align-self:flex-end; flex-direction:row-reverse; }
+.cb-other { align-self:flex-start; }
+.cb-avatar { width:26px; height:26px; border-radius:50%; background:var(--accent); color:white; font-size:.65rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+.cb-body { padding:.35rem .55rem; border-radius:10px; font-size:.82rem; line-height:1.4; word-wrap:break-word; min-width:40px; }
+.cb-own .cb-body { background:var(--accent); color:white; border-bottom-right-radius:3px; }
+.cb-other .cb-body { background:var(--bg3); color:var(--text); border:1px solid var(--border); border-bottom-left-radius:3px; }
+.cb-user { font-size:.68rem; font-weight:600; margin-bottom:.1rem; opacity:.7; }
+.cb-text { white-space:pre-wrap; }
+.cb-time { font-size:.6rem; opacity:.6; text-align:right; margin-top:.15rem; }
+.cb-own .cb-time { color:rgba(255,255,255,.7); }
+.cb-audio-wrap { max-width:200px; }
+.cb-audio { width:100%; height:32px; border-radius:6px; }
+@media(max-width:768px){ .chat-full { border-radius:0; border-left:none; border-right:none; height:calc(100vh - 3.5rem); } }
 </style>
 
-<div class="chat-layout">
-  <div class="chat-header">
-    <h2><i class="fas fa-comment-dots"></i> Chat General</h2>
+<div class="chat-full">
+  <div class="cs-header">
+    <h3><i class="ti ti-message"></i> Chat</h3>
   </div>
-  {{if eq .Role "admin"}}
-  <div class="chat-toolbar">
-    <button class="btn btn-sm btn-danger" onclick="borrarTodos()"><i class="fas fa-trash"></i> Borrar todos</button>
-  </div>
-  {{end}}
-  <div class="chat-messages" id="messages">
-    <div class="chat-empty" id="empty-msg"><i class="fas fa-comment-dots" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.3;"></i>Sin mensajes aún</div>
-  </div>
-  <div class="chat-input-wrap">
-    <input type="text" id="msg-input" placeholder="Escribe un mensaje..." onkeydown="if(event.key==='Enter')enviarMensaje()" autocomplete="off">
-    <button class="btn btn-primary" onclick="enviarMensaje()"><i class="fas fa-paper-plane"></i> Enviar</button>
+  <div class="cs-canales" id="chat-canal-list"></div>
+  <div class="cs-conversacion">
+    <div class="cs-msgs-header" id="chat-header-title"><i class="ti ti-hash"></i> General</div>
+    <div class="cs-msgs" id="chat-mensajes">
+      <div class="cs-empty" id="chat-empty"><i class="ti ti-message-off" style="font-size:1.5rem;display:block;margin-bottom:.3rem;"></i>Sin mensajes</div>
+    </div>
+    <div class="voice-recorder" id="voice-recorder">
+      <span class="vr-pulse"></span>
+      <span id="voice-timer">0:00</span>
+      <button class="vr-btn" id="btn-cancel-voice"><i class="ti ti-x"></i></button>
+      <button class="vr-btn" id="btn-stop-voice"><i class="ti ti-square"></i></button>
+    </div>
+    <div class="cs-bottom">
+      <button class="btn-voice" id="btn-voice" title="Nota de voz"><i class="ti ti-microphone"></i></button>
+      <textarea id="chat-input" placeholder="Escribe un mensaje..." rows="1"></textarea>
+      <button class="cs-send" id="btn-send"><i class="ti ti-send"></i></button>
+    </div>
   </div>
 </div>
 
-<script>
-var currentUserId = {{.UserID}}, ws;
-
-function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function formatTime(ts){
-  if(!ts) return '';
-  var m = ts.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if(!m) return ts;
-  var d = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]);
-  return d.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
-}
-
-function renderMsg(data){
-  var isOwn = (data.user_id||data.usuario_id||0) === currentUserId;
-  var content = data.content || data.message || data.mensaje || '';
-  var user = data.username || data.usuario || '?';
-  var t = data.created || data.created_on || data.timestamp || '';
-  var avatar = user.charAt(0).toUpperCase();
-  return '<div class="msg '+(isOwn?'own':'other')+'">'+
-    '<div>'+escapeHtml(content)+'</div>'+
-    '<div class="meta">'+
-      '<span class="usr">'+escapeHtml(user)+'</span>'+
-      '<span class="time">'+formatTime(t)+'</span>'+
-    '</div></div>';
-}
-
-function appendMsg(data){
-  var cont = document.getElementById('messages');
-  var empty = document.getElementById('empty-msg');
-  if(empty) empty.style.display = 'none';
-  cont.insertAdjacentHTML('beforeend', renderMsg(data));
-  cont.scrollTop = cont.scrollHeight;
-}
-
-var loadingOlder = false;
-var hasMore = true;
-var oldestLoadedId = null;
-
-function cargarMensajes(prepend){
-  if(loadingOlder) return;
-  loadingOlder = true;
-  var url = '/api/chat/mensajes?limit=20';
-  if(prepend && oldestLoadedId) url += '&before_id=' + oldestLoadedId;
-  fetch(url).then(function(r){return r.json();}).then(function(msgs){
-    var cont = document.getElementById('messages');
-    var empty = document.getElementById('empty-msg');
-    if(!msgs.length){
-      if(!prepend){ empty.style.display = 'block'; cont.innerHTML = ''; cont.appendChild(empty); }
-      hasMore = false;
-      loadingOlder = false;
-      return;
-    }
-    empty.style.display = 'none';
-    var html = msgs.reverse().map(renderMsg).join('');
-    if(prepend){
-      var scrollHeightBefore = cont.scrollHeight;
-      cont.insertAdjacentHTML('afterbegin', html);
-      oldestLoadedId = msgs[msgs.length-1].id;
-      cont.scrollTop = cont.scrollHeight - scrollHeightBefore;
-    }else{
-      cont.innerHTML = html;
-      oldestLoadedId = msgs[msgs.length-1].id;
-      cont.scrollTop = cont.scrollHeight;
-    }
-    if(msgs.length < 20) hasMore = false;
-    loadingOlder = false;
-  }).catch(function(){ loadingOlder = false; });
-}
-
-document.getElementById('messages').addEventListener('scroll', function(){
-  var cont = this;
-  if(cont.scrollTop === 0 && hasMore && !loadingOlder){
-    cargarMensajes(true);
-  }
-});
-
-function enviarMensaje(){
-  var input = document.getElementById('msg-input');
-  var texto = input.value.trim();
-  if(!texto) return;
-  input.value = '';
-  if(ws && ws.readyState === WebSocket.OPEN){
-    ws.send(JSON.stringify({type:'chat', id:'msg_'+Date.now(), payload:texto}));
-    return;
-  }
-  fetch('/api/chat/mensajes', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({mensaje:texto})
-  }).then(function(){ cargarMensajes(); }).catch(function(){});
-}
-
-function borrarTodos(){
-  if(!confirm('¿Borrar todos los mensajes del chat?')) return;
-  fetch('/api/chat/mensajes', {method:'DELETE'}).then(function(r){
-    if(r.ok){ document.getElementById('messages').innerHTML = ''; cargarMensajes(); }
-  }).catch(function(){});
-}
-
-function conectarWS(){
-  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  var session = document.cookie.split('; ').find(function(c){return c.startsWith('session=');});
-  var token = session ? session.split('=')[1] : '';
-  ws = new WebSocket(proto+'//'+location.host+'/api/chat/ws');
-  ws.onopen = function(){
-    if(token) ws.send(JSON.stringify({type:'auth', id:'auth_1', token:token}));
-  };
-  ws.onmessage = function(e){
-    var m = JSON.parse(e.data);
-    if(m.type === 'chat') appendMsg(m);
-  };
-  ws.onclose = function(){ setTimeout(conectarWS, 2000); };
-  ws.onerror = function(){ ws.close(); };
-}
-
-cargarMensajes();
-conectarWS();
-setInterval(function(){
-  if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'ping', id:'ping_'+Date.now()}));
-}, 25000);
-</script>
+<script src="/static/pos-chat.js"></script>
 {{end}}

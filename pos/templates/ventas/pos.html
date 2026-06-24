@@ -150,10 +150,15 @@
 .cs-bottom .cs-send:hover { background:var(--primary-dark); }
 .cs-bottom .cs-send:active { transform:scale(.95); }
 
-/* FAB */
-#chat-fab { position:fixed; bottom:20px; right:20px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:white; border:none; font-size:1.4rem; cursor:pointer; box-shadow:0 4px 15px rgba(0,0,0,.2); z-index:999; display:flex; align-items:center; justify-content:center; }
+/* FABs */
+#chat-fab, #cart-fab { cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; }
+#chat-fab:active, #cart-fab:active { cursor:grabbing; }
+#chat-fab { position:fixed; left:20px; bottom:90px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:white; border:none; font-size:1.4rem; box-shadow:0 4px 15px rgba(0,0,0,.2); z-index:999; display:flex; align-items:center; justify-content:center; }
 #chat-fab:active { transform:scale(.95); }
 #chat-fab-badge { position:absolute; top:-3px; right:-3px; min-width:20px; height:20px; border-radius:999px; background:var(--danger); color:white; font-size:.6rem; font-weight:700; align-items:center; justify-content:center; padding:0 .35rem; border:2px solid var(--bg2); display:none; }
+#cart-fab { position:fixed; left:20px; bottom:20px; width:56px; height:56px; border-radius:50%; background:var(--primary); color:white; border:none; font-size:1.4rem; box-shadow:0 4px 15px rgba(0,0,0,.2); z-index:998; display:flex; align-items:center; justify-content:center; }
+#cart-fab:active { transform:scale(.95); }
+#cart-fab .badge { position:absolute; top:-3px; right:-3px; min-width:20px; height:20px; border-radius:999px; background:var(--danger); color:white; font-size:.6rem; font-weight:700; align-items:center; justify-content:center; padding:0 .35rem; border:2px solid var(--bg2); }
 
 .cb { display:flex; gap:.4rem; max-width:92%; margin-bottom:.15rem; }
 .cb-own { align-self:flex-end; flex-direction:row-reverse; }
@@ -229,12 +234,8 @@
 .btn-cancelar:hover { border-color:var(--danger); color:var(--danger); }
 .cart-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:998; backdrop-filter:blur(3px); }
 .cart-overlay.open { display:block; }
-.cart-fab { display:none; position:fixed; bottom:1.2rem; right:1.2rem; width:60px; height:60px; background:var(--primary); color:white; border-radius:50%; border:none; box-shadow:0 4px 15px rgba(0,0,0,0.3); cursor:pointer; z-index:997; align-items:center; justify-content:center; font-size:1.5rem; transition:transform .2s; }
-.cart-fab:active { transform:scale(.95); }
-.cart-fab .badge { position:absolute; top:-5px; right:-5px; background:var(--danger); color:white; border-radius:50%; width:24px; height:24px; font-size:.75rem; font-weight:bold; display:flex; align-items:center; justify-content:center; border:2px solid var(--bg2); }
 @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)} }
-.cart-fab.pulse { animation:pulse .3s ease; }
-.pos-mode-mobile .cart-fab { display:flex; align-items:center; justify-content:center; }
+#cart-fab.pulse { animation:pulse .3s ease; }
 .pos-mode-mobile .cart-panel { display:none; position:fixed; bottom:0; left:0; right:0; height:85vh; max-height:85vh; background:var(--bg2); z-index:999; flex-direction:column; border-radius:var(--radius-lg) var(--radius-lg) 0 0; box-shadow:0 -4px 30px rgba(0,0,0,0.2); animation:slideUp .3s ease-out; }
 .pos-mode-mobile .cart-panel.open { display:flex; }
 
@@ -395,7 +396,7 @@
     </div>
   </div>
 
-  <button class="cart-fab" id="cart-fab" onclick="toggleCart()">
+  <button id="cart-fab" onclick="toggleCart()" title="Carrito">
     <i class="ti ti-shopping-cart"></i><span class="badge" id="fab-count">0</span>
   </button>
 </div>

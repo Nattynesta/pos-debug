@@ -198,6 +198,7 @@ class ChatSidebar {
       var m = JSON.parse(e.data)
       if (m.type === 'ack' && m.status === 'authenticated') {
         this.userId = m.user_id || this.userId
+        this.username = m.username || this.username
         if (this.currentCanalId) this.ws.send(JSON.stringify({ type: 'subscribe', id: 'sub_init', extra: { canal_id: this.currentCanalId } }))
         return
       }
@@ -290,20 +291,26 @@ class ChatSidebar {
   }
 
   async sendVoice(blob) {
-    var url = URL.createObjectURL(blob)
-    var datos = JSON.stringify({ url: url, duration: this.recordingSeconds })
-    var texto = '🎤 Nota de voz (' + this.recordingSeconds + 's)'
+    try {
+      var form = new FormData()
+      form.append('audio', blob, 'voice.webm')
+      var resp = await fetch('/api/chat/upload-audio', { method: 'POST', body: form })
+      var result = await resp.json()
+      var audioUrl = result.url || ''
+      var datos = JSON.stringify({ url: audioUrl, duration: this.recordingSeconds })
+      var texto = '🎤 Nota de voz (' + this.recordingSeconds + 's)'
 
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'chat', id: 'v_' + Date.now(), payload: texto, extra: { canal_id: this.currentCanalId, tipo: 'voz', datos: datos } }))
-    } else {
-      try {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'chat', id: 'v_' + Date.now(), payload: texto, extra: { canal_id: this.currentCanalId, tipo: 'voz', datos: datos } }))
+      } else {
         await fetch('/api/chat/mensajes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mensaje: texto, canal_id: this.currentCanalId, tipo: 'voz', datos: datos })
         })
-      } catch (e) {}
+      }
+    } catch (e) {
+      console.error('Error uploading audio:', e)
     }
   }
 
@@ -336,6 +343,59 @@ class ChatSidebar {
   esc(s) {
     if (typeof s !== 'string') return ''
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  }
+
+  // ---- Drag FAB ----
+
+  makeDraggable(el) {
+    if (!el) return
+    var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0
+    el.onmousedown = function(e) {
+      e.preventDefault()
+      pos3 = e.clientX
+      pos4 = e.clientY
+      document.onmousemove = dragMouse
+      document.onmouseup = stopDrag
+      el.style.cursor = 'grabbing'
+    }
+    el.ontouchstart = function(e) {
+      e.preventDefault()
+      var t = e.touches[0]
+      pos3 = t.clientX
+      pos4 = t.clientY
+      document.ontouchmove = dragTouch
+      document.ontouchend = stopDrag
+    }
+    function dragMouse(e) {
+      e.preventDefault()
+      pos1 = pos3 - e.clientX
+      pos2 = pos4 - e.clientY
+      pos3 = e.clientX
+      pos4 = e.clientY
+      el.style.top = (el.offsetTop - pos2) + 'px'
+      el.style.left = (el.offsetLeft - pos1) + 'px'
+      el.style.bottom = 'auto'
+      el.style.right = 'auto'
+    }
+    function dragTouch(e) {
+      e.preventDefault()
+      var t = e.touches[0]
+      pos1 = pos3 - t.clientX
+      pos2 = pos4 - t.clientY
+      pos3 = t.clientX
+      pos4 = t.clientY
+      el.style.top = (el.offsetTop - pos2) + 'px'
+      el.style.left = (el.offsetLeft - pos1) + 'px'
+      el.style.bottom = 'auto'
+      el.style.right = 'auto'
+    }
+    function stopDrag() {
+      document.onmouseup = null
+      document.onmousemove = null
+      document.ontouchmove = null
+      document.ontouchend = null
+      el.style.cursor = 'grab'
+    }
   }
 
   // ---- Events ----
@@ -390,6 +450,9 @@ class ChatSidebar {
     if (chatInput) {
       chatInput.oninput = function() { this.autoExpand(chatInput) }.bind(this)
     }
+    // Make FABs draggable
+    this.makeDraggable(document.getElementById('chat-fab'))
+    this.makeDraggable(document.getElementById('cart-fab'))
   }
 }
 

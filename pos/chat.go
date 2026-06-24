@@ -3,7 +3,11 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -164,7 +168,13 @@ func handleChatWS(w http.ResponseWriter, r *http.Request) {
 			client.canales[1] = true
 			authenticated = true
 			authTimer.Stop()
-			sendJSON(client, map[string]string{"type": "ack", "id": msg.ID, "status": "authenticated"})
+			sendJSON(client, map[string]interface{}{
+				"type":     "ack",
+				"id":       msg.ID,
+				"status":   "authenticated",
+				"user_id":  uid,
+				"username": username,
+			})
 
 		case "subscribe":
 			if !authenticated {
@@ -525,6 +535,49 @@ func handleChatOnline(w http.ResponseWriter, r *http.Request) {
 	count := len(wsClients)
 	wsClientsMu.Unlock()
 	jsonResp(w, map[string]int{"count": count})
+}
+
+func handleChatUploadAudio(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		jsonErr(w, "Method not allowed", 405)
+		return
+	}
+	uid := getUserID(r)
+	if uid <= 0 {
+		jsonErr(w, "No autenticado", 401)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20) // 5MB max
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		jsonErr(w, "Archivo muy grande o inválido", 400)
+		return
+	}
+	file, header, err := r.FormFile("audio")
+	if err != nil {
+		jsonErr(w, "Campo 'audio' requerido", 400)
+		return
+	}
+	defer file.Close()
+
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".webm"
+	}
+	filename := fmt.Sprintf("audio_%d_%d%s", uid, time.Now().UnixNano(), ext)
+	home, _ := os.UserHomeDir()
+	audioDir := filepath.Join(home, ".abarrotes-pdv", "audio")
+	os.MkdirAll(audioDir, 0755)
+	dst, err := os.Create(filepath.Join(audioDir, filename))
+	if err != nil {
+		jsonErr(w, "Error al guardar", 500)
+		return
+	}
+	defer dst.Close()
+	if _, err := io.Copy(dst, file); err != nil {
+		jsonErr(w, "Error al escribir", 500)
+		return
+	}
+	jsonResp(w, map[string]string{"url": "/audio/" + filename})
 }
 
 func getUserID(r *http.Request) int {

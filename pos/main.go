@@ -198,7 +198,14 @@ func main() {
 	mux.HandleFunc("PUT /api/chat/leido", handleChatLeido)
 	mux.HandleFunc("GET /api/chat/usuarios", handleChatUsuarios)
 	mux.HandleFunc("GET /api/chat/online", handleChatOnline)
+	mux.HandleFunc("POST /api/chat/upload-audio", handleChatUploadAudio)
 	mux.HandleFunc("GET /api/chat/ws", handleChatWS)
+
+	mux.Handle("GET /audio/", http.StripPrefix("/audio/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		home, _ := os.UserHomeDir()
+		audioDir := filepath.Join(home, ".abarrotes-pdv", "audio")
+		http.FileServer(http.Dir(audioDir)).ServeHTTP(w, r)
+	})))
 
 	mux.HandleFunc("GET /", handleIndex)
 
@@ -378,7 +385,7 @@ func withCORS(next http.Handler) http.Handler {
 
 func withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/static/") || strings.HasPrefix(r.URL.Path, "/login") || strings.HasPrefix(r.URL.Path, "/api/") {
+		if strings.HasPrefix(r.URL.Path, "/static/") || strings.HasPrefix(r.URL.Path, "/login") || strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/audio/") {
 			next.ServeHTTP(w, r)
 			return
 		}

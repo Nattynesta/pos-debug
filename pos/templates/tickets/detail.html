@@ -98,6 +98,17 @@ fetch('/api/tickets/'+ticketId).then(r=>r.json()).then(function(t){
     document.getElementById('td-total').textContent = '$'+t.total.toFixed(2);
     document.getElementById('td-pago').textContent = '$'+(t.pago_con||0).toFixed(2);
     document.getElementById('td-cambio').textContent = '$'+(t.total_devuelto||0).toFixed(2);
+    // Show pagos table
+    fetch('/api/tickets/'+ticketId+'/pagos').then(r=>r.json()).then(function(ps){
+      if(ps && ps.length){
+        var html = '<tr><td colspan="3" class="text-right"><strong>Pagos</strong></td><td></td></tr>';
+        ps.forEach(function(p){
+          var lbl = {e:'Efectivo',t:'Tarjeta',v:'Vales',c:'Crédito',x:'Transferencia'}[p.metodo]||p.metodo;
+          html += '<tr><td colspan="3" class="text-right">'+lbl+'</td><td>$'+p.monto.toFixed(2)+'</td></tr>';
+        });
+        document.querySelector('#td-articulos').closest('table').querySelector('tfoot').insertAdjacentHTML('beforeend', html);
+      }
+    });
     var esCreditoDet = t.forma_pago==='c' && t.esta_cancelado!=='t';
     var adeudo = esCreditoDet ? Math.max(0, t.total - (t.pago_con||0)) : 0;
     document.getElementById('td-adeudo').textContent = '$'+adeudo.toFixed(2);
@@ -199,9 +210,9 @@ function confirmarCobro(){
     fetch('/api/tickets/'+ticketId+'/cobrar', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({pago_con: recibido, forma_pago: forma, referencia: referencia || null})
+        body:JSON.stringify({pagos:[{metodo:forma, monto:recibido, recibido:forma==='e'?recibido:0, referencia:referencia||null}]})
     }).then(r=>r.json()).then(function(res){
-        if(res.ok){
+        if(res.ok || res.cambio){
             cerrarCobroModal();
             location.reload();
         } else {

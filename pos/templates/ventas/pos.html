@@ -120,6 +120,51 @@
 .pos-mode-mobile .carrito-resumen .cr-total { font-weight:700; font-size:1.05rem; color:var(--success); }
 .pos-mode-mobile .carrito-resumen .cr-count { font-size:.85rem; color:var(--text3); }
 
+/* ===== CHAT SIDEBAR ===== */
+.chat-toggle-btn { position:relative; display:flex; align-items:center; gap:.3rem; padding:.45rem .8rem; border:1.5px solid var(--border); border-radius:8px; background:var(--bg2); font-size:.85rem; cursor:pointer; transition:all .15s; white-space:nowrap; color:var(--text2); }
+.chat-toggle-btn:hover { border-color:var(--primary); color:var(--primary); background:rgba(8,145,178,.1); }
+.chat-toggle-btn .ct-badge { display:none; position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; border-radius:999px; background:var(--danger); color:white; font-size:.6rem; font-weight:700; align-items:center; justify-content:center; padding:0 .3rem; border:2px solid var(--bg2); }
+#chat-sidebar { position:fixed; right:0; top:3.5rem; bottom:0; width:340px; background:var(--bg2); border-left:1.5px solid var(--border); z-index:900; transform:translateX(100%); transition:transform .25s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column; box-shadow:-4px 0 20px rgba(0,0,0,.1); }
+#chat-sidebar.open { transform:translateX(0); }
+.cs-header { display:flex; align-items:center; justify-content:space-between; padding:.65rem 1rem; border-bottom:1px solid var(--border); flex-shrink:0; }
+.cs-header h3 { margin:0; font-size:.95rem; font-weight:600; display:flex; align-items:center; gap:.35rem; }
+.cs-header .cs-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:1.1rem; padding:.2rem; border-radius:6px; }
+.cs-header .cs-close:hover { background:var(--bg3); color:var(--text); }
+.cs-canales { flex:0 0 auto; max-height:40%; overflow-y:auto; border-bottom:1px solid var(--border); }
+.cs-canales .cc-item { display:flex; align-items:center; gap:.5rem; padding:.5rem .85rem; cursor:pointer; transition:all .1s; border-left:3px solid transparent; }
+.cs-canales .cc-item:hover { background:var(--bg3); }
+.cs-canales .cc-item.active { background:rgba(8,145,178,.1); border-left-color:var(--primary); }
+.cs-canales .cc-item .cc-icon { width:24px; text-align:center; color:var(--text3); font-size:1rem; flex-shrink:0; }
+.cs-canales .cc-item .cc-name { flex:1; font-size:.85rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cs-canales .cc-item .cc-badge { min-width:20px; height:20px; border-radius:999px; background:var(--accent); color:white; font-size:.65rem; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 .35rem; }
+.cs-conversacion { flex:1; display:flex; flex-direction:column; min-height:0; }
+.cs-msgs-header { padding:.45rem .85rem; font-size:.75rem; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:.03em; border-bottom:1px solid var(--border); flex-shrink:0; background:var(--bg3); }
+.cs-msgs { flex:1; overflow-y:auto; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.25rem; }
+.cs-empty { text-align:center; color:var(--text3); padding:2rem .5rem; font-size:.78rem; flex:1; display:flex; align-items:center; justify-content:center; }
+.cs-bottom { padding:.5rem .65rem; border-top:1px solid var(--border); display:flex; gap:.4rem; align-items:flex-end; flex-shrink:0; }
+.cs-bottom textarea { flex:1; resize:none; border:1.5px solid var(--border); border-radius:8px; padding:.45rem .65rem; font-size:.85rem; background:var(--bg3); color:var(--text); font-family:inherit; max-height:100px; min-height:36px; line-height:1.4; }
+.cs-bottom textarea:focus { outline:none; border-color:var(--primary); }
+.cs-bottom .cs-send { width:36px; height:36px; border-radius:8px; border:none; background:var(--accent); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; transition:all .1s; }
+.cs-bottom .cs-send:hover { background:var(--primary-dark); }
+.cs-bottom .cs-send:active { transform:scale(.95); }
+
+.cb { display:flex; gap:.4rem; max-width:92%; margin-bottom:.15rem; }
+.cb-own { align-self:flex-end; flex-direction:row-reverse; }
+.cb-other { align-self:flex-start; }
+.cb-avatar { width:26px; height:26px; border-radius:50%; background:var(--accent); color:white; font-size:.65rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+.cb-body { padding:.35rem .55rem; border-radius:10px; font-size:.82rem; line-height:1.4; word-wrap:break-word; min-width:40px; }
+.cb-own .cb-body { background:var(--accent); color:white; border-bottom-right-radius:3px; }
+.cb-other .cb-body { background:var(--bg3); color:var(--text); border:1px solid var(--border); border-bottom-left-radius:3px; }
+.cb-user { font-size:.68rem; font-weight:600; margin-bottom:.1rem; opacity:.7; }
+.cb-text { white-space:pre-wrap; }
+.cb-time { font-size:.6rem; opacity:.6; text-align:right; margin-top:.15rem; }
+.cb-own .cb-time { color:rgba(255,255,255,.7); }
+
+@media(max-width:768px) {
+  #chat-sidebar { width:100%; top:0; z-index:1000; }
+  .cs-canales { max-height:30%; }
+}
+
 /* ===== CART PANEL ===== */
 .cart-panel { flex-shrink:0; }
 .cart-header { padding:.8rem 1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; }
@@ -149,9 +194,16 @@
 .cart-total-row .subtotal { font-size:1rem; font-weight:600; color:var(--text); }
 .cart-total-row .total { font-size:1.55rem; font-weight:800; color:var(--text); }
 .cart-pago-wrap { display:flex; flex-direction:column; gap:.5rem; }
-.cart-pago-row { display:flex; gap:.5rem; }
-.cart-pago-row select, .cart-pago-row input { flex:1; padding:.5rem .75rem; border:1.5px solid var(--border); border-radius:8px; font-size:.95rem; background:var(--bg3); color:var(--text); }
-.cart-pago-row select:focus, .cart-pago-row input:focus { outline:none; border-color:var(--primary); }
+.pagos-list { display:flex; flex-direction:column; gap:.35rem; max-height:200px; overflow-y:auto; }
+.pago-line { display:flex; gap:.3rem; align-items:center; }
+.pago-line select { flex:0 0 95px; padding:.35rem .4rem; border:1.5px solid var(--border); border-radius:6px; font-size:.8rem; background:var(--bg3); color:var(--text); }
+.pago-line input { flex:1; min-width:0; padding:.35rem .4rem; border:1.5px solid var(--border); border-radius:6px; font-size:.8rem; background:var(--bg3); color:var(--text); width:60px; }
+.pago-line .pago-remove { flex:none; background:none; border:none; color:var(--text3); cursor:pointer; font-size:1rem; padding:0 .2rem; line-height:1; }
+.pago-line .pago-remove:hover { color:var(--danger); }
+.pago-actions { display:flex; justify-content:space-between; align-items:center; gap:.5rem; }
+.pago-remain { font-size:.8rem; font-weight:600; color:var(--text2); }
+.btn-add-pago { padding:.25rem .6rem; font-size:.78rem; border:1.5px dashed var(--border); border-radius:6px; background:transparent; cursor:pointer; color:var(--text3); display:inline-flex; align-items:center; gap:.25rem; }
+.btn-add-pago:hover { border-color:var(--primary); color:var(--primary); }
 .btn-cobrar { width:100%; padding:.8rem; font-size:1.05rem; font-weight:700; border:none; border-radius:var(--radius); cursor:pointer; transition:all .12s; display:flex; align-items:center; justify-content:center; gap:.5rem; background:var(--success); color:white; }
 .btn-cobrar:hover { background:#059669; box-shadow:var(--shadow-md); }
 .btn-cobrar:active { transform:scale(.98); }
@@ -244,6 +296,11 @@
   .pos-mode-mobile .product-grid { grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:.35rem; }
   .pos-mode-mobile .cart-panel { height:90vh; max-height:90vh; }
 }
+/* ===== SOUND TOGGLE ===== */
+#sound-toggle { background:none; border:none; color:var(--text3); font-size:1.15rem; cursor:pointer; padding:.25rem; border-radius:6px; transition:all .15s; display:flex; align-items:center; }
+#sound-toggle:hover { color:var(--text); background:var(--bg3); }
+/* ===== SEARCH DROPDOWN ===== */
+#search-dropdown .search-result-item[aria-selected="true"] { background:var(--accent) !important; color:white !important; }
 </style>
 
 <div class="pos-stats" id="posStats">
@@ -265,8 +322,10 @@
         <i class="ti ti-search search-icon"></i>
         <input type="text" id="search" placeholder="Buscar o escanear código..." oninput="searchProductos(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();escanearCodigo(this.value)}" autofocus>
       </div>
+      <button id="sound-toggle" onclick="SoundManager.setMuted(!SoundManager.isMuted());SoundManager.updateIcon();" title="Sonido"><i class="ti ti-volume"></i></button>
       <button class="btn-ignore-stock" id="btn-ignore-stock" onclick="toggleIgnoreStock()" title="Ignorar stock agotado"><i class="ti ti-circle-off"></i><span> Stock</span></button>
       <button class="btn-off" onclick="sincronizarOFF(this)" title="Sincronizar OFF"><i class="ti ti-cloud-download"></i><span class="off-label"> OFF</span></button>
+      <button class="chat-toggle-btn" onclick="toggleChatSidebar()" title="Chat (Ctrl+Shift+C)"><i class="ti ti-message"></i> Chat <span class="ct-badge" id="chat-toggle-badge"></span></button>
     </div>
     <div class="dept-chips" id="dept-chips"></div>
     <div class="client-bar">
@@ -303,23 +362,42 @@
         <span class="total" id="cart-total">$0.00</span>
       </div>
       <div class="cart-pago-wrap">
-        <div class="cart-pago-row">
-          <select id="formaPago"><option value="e">Efectivo</option></select>
-          <select id="prioridad" onchange="actualizarPrioBadge()" style="width:auto;">
-            <option value="0">Normal</option><option value="1">Baja</option><option value="2">Normal</option><option value="3">Alta</option><option value="4">Urgente</option>
-          </select>
+        <div class="pagos-list" id="pagos-list"></div>
+        <div class="pago-actions">
+          <div class="pago-remain" id="pago-remain">Restante: $0.00</div>
+          <button class="btn-add-pago" onclick="agregarLineaPago()"><i class="ti ti-plus"></i> Pago</button>
         </div>
-        <input type="number" id="pagoCon" step="0.01" min="0" placeholder="$ recibido">
+        <select id="prioridad" onchange="actualizarPrioBadge()" style="width:100%;margin-top:.25rem;padding:.4rem;border-radius:6px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);font-size:.85rem;">
+          <option value="0">Normal</option><option value="1">Baja</option><option value="2">Normal</option><option value="3">Alta</option><option value="4">Urgente</option>
+        </select>
       </div>
-      <button class="btn-cobrar" onclick="cobrar()"><i class="ti ti-credit-card"></i> Cobrar <span class="kbd-hint">F4</span></button>
+      <button class="btn-cobrar" onclick="cobrar()" title="Cobrar (F1)"><i class="ti ti-credit-card"></i> Cobrar <span class="kbd-hint">F1</span></button>
       <button id="btn-pedido" class="btn-cobrar" onclick="crearPedidoDesdePos()" disabled style="opacity:.4;background:var(--warning);color:white;padding:.5rem 1rem;border:none;border-radius:6px;font-size:.875rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:.35rem;"><i class="ti ti-clipboard-list"></i> Pedido</button>
-      <button class="btn-cancelar" onclick="cancelarCarrito()">Cancelar venta</button>
+      <button class="btn-cancelar" onclick="cancelarCarrito()" title="Cancelar venta (Ctrl+L)">Cancelar venta</button>
     </div>
   </div>
 
   <button class="cart-fab" id="cart-fab" onclick="toggleCart()">
     <i class="ti ti-shopping-cart"></i><span class="badge" id="fab-count">0</span>
   </button>
+</div>
+
+<div id="chat-sidebar">
+  <div class="cs-header">
+    <h3><i class="ti ti-message"></i> Chat</h3>
+    <button class="cs-close" onclick="toggleChatSidebar()">&times;</button>
+  </div>
+  <div class="cs-canales" id="chat-canal-list"></div>
+  <div class="cs-conversacion">
+    <div class="cs-msgs-header" id="chat-header-title"><i class="ti ti-hash"></i> General</div>
+    <div class="cs-msgs" id="chat-mensajes">
+      <div class="cs-empty" id="chat-empty"><i class="ti ti-message-off" style="font-size:1.5rem;display:block;margin-bottom:.3rem;"></i>Sin mensajes</div>
+    </div>
+    <div class="cs-bottom" id="chat-bottom">
+      <textarea id="chat-input" placeholder="Escribe un mensaje..." oninput="autoExpandChatInput(this)" rows="1"></textarea>
+      <button class="cs-send" onclick="enviarMensajeChat()"><i class="ti ti-send"></i></button>
+    </div>
+  </div>
 </div>
 
 <div class="nc-modal" id="new-client-modal">
@@ -359,10 +437,39 @@
 <div class="toast" id="toast"></div>
 <div class="notif-stack" id="notif-stack"></div>
 
+<button class="help-btn" id="help-btn" onclick="abrirHelpModal()" title="Atajos de teclado (?)">?</button>
+<div class="help-modal" id="help-modal">
+  <div class="help-content">
+    <h3><i class="ti ti-keyboard"></i> Atajos de Teclado</h3>
+    <div class="help-grid">
+      <span class="key">F1</span><span class="desc">Abrir cobro</span>
+      <span class="key">F2</span><span class="desc">Buscar producto</span>
+      <span class="key">F3</span><span class="desc">Buscar cliente</span>
+      <span class="key">F4</span><span class="desc">Imprimir último ticket</span>
+      <span class="key">F5</span><span class="desc">Refrescar catálogo</span>
+      <span class="key">F8</span><span class="desc">Abrir cajón / Sin venta</span>
+      <span class="key">F9</span><span class="desc">Descuento global</span>
+      <span class="key">F12</span><span class="desc">Cerrar caja / Logout</span>
+      <span class="key">ESC</span><span class="desc">Cerrar modal</span>
+      <span class="key">Ctrl+Z</span><span class="desc">Deshacer último producto</span>
+      <span class="key">Ctrl+L</span><span class="desc">Limpiar carrito</span>
+      <span class="key">Ctrl+D</span><span class="desc">Duplicar última línea</span>
+    </div>
+    <div style="margin-top:1rem;text-align:center;">
+      <button class="btn btn-outline btn-sm" onclick="cerrarHelpModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<audio id="scan-beep" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH9/f3+AgH+"></audio>
+<script src="/static/js/shortcuts.js"></script>
+<script src="/static/js/sounds.js"></script>
+<script src="/static/js/search.js"></script>
+<script src="/static/pos-chat.js"></script>
+
 <script>
 var allProductos = [], departamentos = [], articulos = [], deptColors = {};
 var selectedCliente = null, clientSearchTimeout, ignoreStock = false;
-var cobroConfirmado = false, cobroResolve = null;
+var pagos = [];
 var PRIO_LABELS = {0:'Normal',1:'Baja',2:'Normal',3:'Alta',4:'Urgente'};
 var PRIO_COLORS = {0:'#e5e7eb',1:'#e5e7eb',2:'#fef3c7',3:'#fee2e2',4:'#fecaca'};
 var PRIO_TEXT = {0:'#6b7280',1:'#6b7280',2:'#92400e',3:'#991b1b',4:'#991b1b'};
@@ -421,18 +528,19 @@ function toggleIgnoreStock(){
   notif(ignoreStock ? 'Ignorando stock agotado' : 'Stock activado','warning');
 }
 
-/* ===== KEYBOARD SHORTCUTS ===== */
-document.addEventListener('keydown', function(e){
-  if(e.key === 'F2'){ e.preventDefault(); document.getElementById('search').focus(); }
-  if(e.key === 'F3'){ e.preventDefault(); toggleCart(); }
-  if(e.key === 'F4' && articulos.length){ e.preventDefault(); cobrar(); }
-  if(e.key === 'Escape'){
-    if(document.getElementById('confirm-modal').classList.contains('open')) cerrarConfirmModal();
-    else if(document.getElementById('qv-modal').classList.contains('open')) ocultarQuickView();
-    else if(document.getElementById('new-client-modal').classList.contains('open')) hideNewClientModal();
-    else if(document.getElementById('cart-panel').classList.contains('open')) toggleCart();
-  }
-});
+/* ===== MODAL REGISTRATION ===== */
+registerModal('confirm-modal');
+registerModal('qv-modal');
+registerModal('new-client-modal');
+registerModal('help-modal');
+
+/* ===== HELP MODAL ===== */
+function abrirHelpModal(){ document.getElementById('help-modal').classList.add('open'); }
+function cerrarHelpModal(){ document.getElementById('help-modal').classList.remove('open'); }
+document.getElementById('help-modal').addEventListener('click',function(e){if(e.target===this)cerrarHelpModal();});
+
+/* ===== SOUND TOGGLE ===== */
+SoundManager.updateIcon();
 
 /* ===== CLIENT SEARCH ===== */
 function searchClientes(q){
@@ -498,9 +606,10 @@ function clearCliente(){
 }
 
 function updateFormaPago(){
-  var sel = document.getElementById('formaPago'); sel.innerHTML = '<option value="e">Efectivo</option>';
-  if(selectedCliente){ var opt = document.createElement('option'); opt.value = 'c'; opt.textContent = 'Crédito'; sel.appendChild(opt); }
-  if(sel.value !== 'e' && selectedCliente) sel.value = 'c';
+  if(selectedCliente){
+    var hasCredit = pagos.some(function(p){return p.metodo==='c';});
+    if(!hasCredit) agregarLineaPago('c');
+  }
   var pb = document.getElementById('btn-pedido');
   if(pb){ pb.disabled = !selectedCliente; pb.style.opacity = selectedCliente ? '1' : '.4'; }
 }
@@ -610,13 +719,15 @@ function cambiarCantidadRapida(codigo, delta){
 
 function agregarAlCarrito(codigo){
   var p = allProductos.find(function(x){return x.codigo===codigo;}); if(!p) return;
-  if(p.dinventario <= 0 && !ignoreStock){ notif(p.descripcion||p.codigo+' sin stock','warning'); return; }
+  if(p.dinventario <= 0 && !ignoreStock){ notif(p.descripcion||p.codigo+' sin stock','warning'); SoundManager.play('error'); return; }
+  if(!articulos.length && !pagos.length) agregarLineaPago('e');
   var ex = articulos.find(function(a){return a.producto_codigo===codigo;});
-  if(ex){ex.cantidad+=1;actualizarCarrito();renderProductos(productosFiltrados());notif(p.descripcion||p.codigo+' +1','success');return;}
+  if(ex){ex.cantidad+=1;actualizarCarrito();renderProductos(productosFiltrados());notif(p.descripcion||p.codigo+' +1','success');SoundManager.play('beep');return;}
   articulos.push({producto_codigo:p.codigo,producto_nombre:p.descripcion,cantidad:1,precio_usado:p.pventa,ganancia:p.pventa-p.pcosto});
   actualizarCarrito();
   renderProductos(productosFiltrados());
   notif((p.descripcion||p.codigo)+' agregado','success');
+  SoundManager.play('beep');
   var fab = document.getElementById('cart-fab');
   fab.classList.add('pulse');
   setTimeout(function(){ fab.classList.remove('pulse'); }, 300);
@@ -650,13 +761,76 @@ function actualizarCarrito(){
 function cambiarCantidad(idx,delta){ if(articulos[idx]){ articulos[idx].cantidad=Math.max(1,articulos[idx].cantidad+delta); actualizarCarrito(); renderProductos(productosFiltrados()); } }
 function eliminarArticulo(idx){ articulos.splice(idx,1); actualizarCarrito(); renderProductos(productosFiltrados()); }
 
-/* ===== COBRAR CON CONFIRMACIÓN ===== */
+/* ===== PAGOS / COBRO ===== */
+function totalCarrito(){
+  return articulos.reduce(function(s,a){return s+a.cantidad*a.precio_usado;},0);
+}
+function agregarLineaPago(metodo){
+  metodo = metodo || 'e';
+  pagos.push({metodo:metodo, monto:0, recibido:0});
+  renderizarPagos();
+}
+function quitarLineaPago(idx){
+  pagos.splice(idx,1);
+  renderizarPagos();
+}
+function renderizarPagos(){
+  var el = document.getElementById('pagos-list');
+  var total = totalCarrito();
+  var suma = 0;
+  el.innerHTML = pagos.map(function(p,i){
+    if(p.metodo!=='e') p.recibido = 0;
+    suma += parseFloat(p.monto)||0;
+    var chk = p.metodo==='c' ? ' style="background:var(--warning);color:white;"' : '';
+    return '<div class="pago-line">'+
+      '<select onchange="cambiarMetodoPago('+i+',this.value)"'+chk+'>'+
+        '<option value="e"'+(p.metodo==='e'?' selected':'')+'>Efectivo</option>'+
+        '<option value="t"'+(p.metodo==='t'?' selected':'')+'>Tarjeta</option>'+
+        '<option value="v"'+(p.metodo==='v'?' selected':'')+'>Vales</option>'+
+        '<option value="x"'+(p.metodo==='x'?' selected':'')+'>Transferencia</option>'+
+        (selectedCliente?'<option value="c"'+(p.metodo==='c'?' selected':'')+'>Crédito</option>':'')+
+      '</select>'+
+      '<input type="number" step="0.01" min="0" value="'+(p.monto||'')+'" placeholder="$" onchange="cambiarMontoPago('+i+',this.value)" onfocus="this.select()">'+
+      (p.metodo==='e'?'<input type="number" step="0.01" min="0" value="'+(p.recibido||'')+'" placeholder="recibido" onchange="cambiarRecibidoPago('+i+',this.value)" onfocus="this.select()">':'')+
+      '<button class="pago-remove" onclick="quitarLineaPago('+i+')">&times;</button>'+
+    '</div>';
+  }).join('');
+  actualizarRestante();
+  document.getElementById('btn-pedido').style.display = !pagos.length || !suma ? '' : 'none';
+}
+function cambiarMetodoPago(idx,v){
+  pagos[idx].metodo = v;
+  if(v!=='e') pagos[idx].recibido = 0;
+  renderizarPagos();
+}
+function cambiarMontoPago(idx,v){
+  pagos[idx].monto = parseFloat(v)||0;
+  renderizarPagos();
+}
+function cambiarRecibidoPago(idx,v){
+  pagos[idx].recibido = parseFloat(v)||0;
+  renderizarPagos();
+}
+function actualizarRestante(){
+  var total = totalCarrito();
+  var suma = pagos.reduce(function(s,p){return s + (parseFloat(p.monto)||0);},0);
+  var restante = total - suma;
+  var el = document.getElementById('pago-remain');
+  if(restante <= 0.01){
+    el.textContent = 'Cubierto ✓';
+    el.style.color = 'var(--success)';
+  } else {
+    el.textContent = 'Restante: $'+restante.toFixed(2);
+    el.style.color = 'var(--text2)';
+  }
+}
+
 function cobrar(){
   if(!articulos.length){toast('Carrito vacío','error');return;}
-  var total = articulos.reduce(function(s,a){return s+a.cantidad*a.precio_usado;},0);
-  var fp = document.getElementById('formaPago').value;
-  var pc = fp==='e'?parseFloat(document.getElementById('pagoCon').value):0;
-  if(fp==='e'&&(!pc||pc<total)){toast('Monto insuficiente: $'+total.toFixed(2),'error');return;}
+  var total = totalCarrito();
+  if(!pagos.length) agregarLineaPago('e');
+  var suma = pagos.reduce(function(s,p){return s + (parseFloat(p.monto)||0);},0);
+  if(suma < total - 0.01){toast('Faltan $'+(total-suma).toFixed(2)+' para cubrir el total','error');return;}
   document.getElementById('confirm-items-text').textContent = articulos.reduce(function(s,a){return s+a.cantidad;},0)+' productos';
   document.getElementById('confirm-total').textContent = '$'+total.toFixed(2);
   document.getElementById('confirm-cliente').textContent = selectedCliente ? 'Cliente: '+selectedCliente.nombre : '';
@@ -668,8 +842,7 @@ function cerrarConfirmModal(){ document.getElementById('confirm-modal').classLis
 function confirmarCobro(){
   cerrarConfirmModal();
   if(!articulos.length){toast('Carrito vacío','error');return;}
-  var fp = document.getElementById('formaPago').value, total = articulos.reduce(function(s,a){return s+a.cantidad*a.precio_usado;},0);
-  var pc = fp==='e'?parseFloat(document.getElementById('pagoCon').value):0;
+  var total = totalCarrito();
   var uid = parseInt(document.cookie.split('; ').find(function(c){return c.startsWith('user_id=');})?.split('=')[1]) || 2;
   var body = {caja_id:defaultCajaId,cajero_id:uid,prioridad:parseInt(document.getElementById('prioridad').value)||0};
   if(selectedCliente) body.cliente_id = selectedCliente.numero;
@@ -686,13 +859,19 @@ function confirmarCobro(){
     })).then(function(){return ticketId;});
   })
   .then(function(ticketId){
-    return fetch('/api/tickets/'+ticketId+'/cobrar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pago_con:pc,forma_pago:fp})}).then(function(r){return r.json();});
+    var ps = pagos.filter(function(p){return p.monto>0;}).map(function(p){
+      var obj = {metodo:p.metodo, monto:p.monto};
+      if(p.metodo==='e') obj.recibido = p.recibido || p.monto;
+      return obj;
+    });
+    return fetch('/api/tickets/'+ticketId+'/cobrar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pagos:ps})}).then(function(r){return r.json();});
   })
   .then(function(res){
     if(res.cambio&&parseFloat(res.cambio)>0) notif('Cambio: $'+parseFloat(res.cambio).toFixed(2),'success');
-    else if(fp==='c') notif('Adeudo registrado: $'+total.toFixed(2),'success');
     else notif('Venta completada','success');
-    articulos=[];selectedCliente=null;clearCliente();actualizarCarrito();renderProductos(productosFiltrados());document.getElementById('pagoCon').value='';
+    SoundManager.play('success');
+    _lastTicketId = res.ticket_id || null;
+    articulos=[];selectedCliente=null;clearCliente();pagos=[];actualizarCarrito();renderizarPagos();renderProductos(productosFiltrados());
     cargarStats();
     if(window.innerWidth<768) toggleCart();
   })
@@ -727,9 +906,19 @@ function crearPedidoDesdePos(){
 function cancelarCarrito(){
   if(!articulos.length) return;
   if(!confirm('Cancelar esta venta?')) return;
-  articulos=[];selectedCliente=null;clearCliente();actualizarCarrito();renderProductos(productosFiltrados());
+  articulos=[];selectedCliente=null;clearCliente();pagos=[];actualizarCarrito();renderizarPagos();renderProductos(productosFiltrados());
   if(window.innerWidth<768) toggleCart();
 }
+
+// Shortcut helpers
+var _lastTicketId = null;
+function deshacerUltimo(){ if(!articulos.length) return; articulos.pop(); actualizarCarrito(); renderProductos(productosFiltrados()); notif('Último producto quitado','info'); }
+function duplicarUltimo(){ if(!articulos.length) return; var a=articulos[articulos.length-1]; articulos.push({producto_codigo:a.producto_codigo,producto_nombre:a.producto_nombre,cantidad:a.cantidad,precio_usado:a.precio_usado,ganancia:a.ganancia}); actualizarCarrito(); renderProductos(productosFiltrados()); notif('Línea duplicada','success'); }
+function refreshProductos(){ fetch('/api/productos').then(function(r){return r.json()}).then(function(ps){allProductos=ps;renderProductos(productosFiltrados());notif('Catálogo actualizado','success');}).catch(function(){toast('Error al refrescar','error');}); }
+function handlePrintLastTicket(){ if(!_lastTicketId){ toast('No hay ticket para imprimir','error'); return; } window.open('/api/tickets/'+_lastTicketId+'/print','_blank'); }
+function handleSinVenta(){ notif('Cajón abierto (sin venta)','info'); }
+function handleDescuentoGlobal(){ var pct = prompt('Descuento global % (0-100):','0'); if(pct!==null){ var p=parseFloat(pct); if(!isNaN(p)&&p>0&&p<=100){ articulos.forEach(function(a){a.precio_usado=a.precio_usado*(1-p/100);}); actualizarCarrito(); renderProductos(productosFiltrados()); notif('Descuento del '+p+'% aplicado','success'); } } }
+function handleCerrarCaja(){ if(confirm('Cerrar sesión?')) window.location='/logout'; }
 
 function sincronizarOFF(btn){
   btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Sincronizando...';
@@ -744,7 +933,7 @@ function sincronizarOFF(btn){
 function escanearCodigo(v){
   v=v.trim(); if(!v)return;
   var p=allProductos.find(function(x){return x.codigo===v;});
-  if(p){agregarAlCarrito(v);document.getElementById('search').value='';searchProductos('');}
+  if(p){agregarAlCarrito(v);document.getElementById('search').value='';searchProductos(''); try{document.getElementById('scan-beep').play();}catch(e){}}
   else{document.getElementById('search').value=v;searchProductos(v);}
 }
 
@@ -791,5 +980,6 @@ function ocultarQuickView(){ document.getElementById('qv-modal').classList.remov
 document.getElementById('qv-modal').addEventListener('click',function(e){if(e.target===this)ocultarQuickView();});
 document.getElementById('new-client-modal').addEventListener('click',function(e){if(e.target===this)hideNewClientModal();});
 document.getElementById('confirm-modal').addEventListener('click',function(e){if(e.target===this)cerrarConfirmModal();});
+initChatSidebar('{{.User}}',{{.UserID}},'{{.User}}');
 </script>
 {{end}}

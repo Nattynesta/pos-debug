@@ -34,6 +34,7 @@ var seedSQL string
 var db *sql.DB
 var tmpl *template.Template
 var pageTmpls map[string]*template.Template
+var negociosName string
 
 func main() {
 	var err error
@@ -51,6 +52,13 @@ func main() {
 
 	if err = migrate(db); err != nil {
 		log.Fatalf("Error migrating: %v", err)
+	}
+
+	migrateLegacyPagos()
+
+	negociosName = os.Getenv("NEGOCIO_NAME")
+	if negociosName == "" {
+		negociosName = "ABARROTES PDV"
 	}
 
 	if err := initCSRF(); err != nil {
@@ -106,6 +114,8 @@ func main() {
 	mux.HandleFunc("PUT /api/productos/{codigo}", handleProductosUpdate)
 	mux.HandleFunc("DELETE /api/productos/{codigo}", handleProductosDelete)
 	mux.HandleFunc("POST /api/productos/{codigo}/imagen", handleProductoUploadImagen)
+	mux.HandleFunc("GET /api/productos/barcode/{codigo}", handleBarcodeLookup)
+	mux.HandleFunc("GET /api/productos/search", handleProductosSearch)
 
 	mux.HandleFunc("GET /api/clientes", handleClientesList)
 	mux.HandleFunc("POST /api/clientes", handleClientesCreate)
@@ -148,6 +158,8 @@ func main() {
 	mux.HandleFunc("POST /api/tickets/{id}/articulo", handleTicketAddArticulo)
 	mux.HandleFunc("DELETE /api/tickets/{id}/articulo/{artId}", handleTicketRemoveArticulo)
 	mux.HandleFunc("POST /api/tickets/{id}/cobrar", handleTicketCobrar)
+	mux.HandleFunc("GET /api/tickets/{id}/pagos", handleTicketPagosList)
+	mux.HandleFunc("GET /api/tickets/{id}/print", handleTicketPrint)
 	mux.HandleFunc("POST /api/tickets/{id}/cancelar", handleTicketCancelar)
 	mux.HandleFunc("PUT /api/tickets/{id}/prioridad", handleTicketActualizarPrioridad)
 	mux.HandleFunc("DELETE /api/tickets/{id}", handleTicketDelete)
@@ -179,9 +191,11 @@ func main() {
 	mux.HandleFunc("GET /api/reportes/ventas-diarias", handleReportesVentasDiarias)
 	mux.HandleFunc("GET /api/reportes/productos-mas-vendidos", handleReportesTopProductos)
 	mux.HandleFunc("POST /api/admin/reset-ventas", withAdmin(handleAdminResetVentas))
+	mux.HandleFunc("GET /api/chat/canales", handleChatCanales)
 	mux.HandleFunc("GET /api/chat/mensajes", handleChatMensajes)
 	mux.HandleFunc("POST /api/chat/mensajes", handleChatMensajes)
-	mux.HandleFunc("DELETE /api/chat/mensajes", handleChatClear)
+	mux.HandleFunc("DELETE /api/chat/mensajes", handleChatMensajes)
+	mux.HandleFunc("PUT /api/chat/leido", handleChatLeido)
 	mux.HandleFunc("GET /api/chat/usuarios", handleChatUsuarios)
 	mux.HandleFunc("GET /api/chat/online", handleChatOnline)
 	mux.HandleFunc("GET /api/chat/ws", handleChatWS)
@@ -306,6 +320,45 @@ func migrate(db *sql.DB) error {
 			}
 		}
 	}
+
+	// Chat tables
+	db.Exec("CREATE TABLE IF NOT EXISTS chat_canales (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL UNIQUE, icono TEXT DEFAULT 'hash', descripcion TEXT DEFAULT '', created_on TEXT DEFAULT (datetime('now','localtime')))")
+	db.Exec("CREATE TABLE IF NOT EXISTS chat_leidos (usuario_id INTEGER NOT NULL, canal_id INTEGER NOT NULL, ultimo_leido_id INTEGER DEFAULT 0, PRIMARY KEY (usuario_id, canal_id), FOREIGN KEY (usuario_id) REFERENCES USUARIOS(id), FOREIGN KEY (canal_id) REFERENCES chat_canales(id))")
+
+	var hasCanalID int
+	db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('CHAT_MESSAGES') WHERE name='canal_id'").Scan(&hasCanalID)
+	if hasCanalID == 0 {
+		db.Exec("ALTER TABLE CHAT_MESSAGES ADD COLUMN canal_id INTEGER DEFAULT 1")
+	}
+	var hasTipo int
+	db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('CHAT_MESSAGES') WHERE name='tipo'").Scan(&hasTipo)
+	if hasTipo == 0 {
+		db.Exec("ALTER TABLE CHAT_MESSAGES ADD COLUMN tipo TEXT DEFAULT ''")
+	}
+	var hasDatosJSON int
+	db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('CHAT_MESSAGES') WHERE name='datos_json'").Scan(&hasDatosJSON)
+	if hasDatosJSON == 0 {
+		db.Exec("ALTER TABLE CHAT_MESSAGES ADD COLUMN datos_json TEXT DEFAULT ''")
+	}
+
+	// Seed default channels
+	var canalCount int
+	db.QueryRow("SELECT COUNT(*) FROM chat_canales").Scan(&canalCount)
+	if canalCount == 0 {
+		db.Exec("INSERT INTO chat_canales (nombre, icono, descripcion) VALUES ('General', 'hash', 'Chat general del equipo')")
+		db.Exec("INSERT INTO chat_canales (nombre, icono, descripcion) VALUES ('Ventas', 'shopping-cart', 'Notificaciones y discusión de ventas')")
+		db.Exec("INSERT INTO chat_canales (nombre, icono, descripcion) VALUES ('Inventario', 'package', 'Movimientos y ajustes de inventario')")
+		db.Exec("INSERT INTO chat_canales (nombre, icono, descripcion) VALUES ('Admin', 'settings', 'Solo administradores')")
+	}
+
+	// FTS5 search index
+	var hasFTS int
+	db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='productos_fts'").Scan(&hasFTS)
+	if hasFTS == 0 {
+		db.Exec(`CREATE VIRTUAL TABLE productos_fts USING fts5(codigo, descripcion, categorias, marca, tokenize='unicode61')`)
+	}
+	db.Exec("DELETE FROM productos_fts")
+	db.Exec(`INSERT INTO productos_fts (codigo, descripcion, categorias, marca) SELECT codigo, COALESCE(descripcion,''), COALESCE(categorias,''), COALESCE(p.marca,'') FROM PRODUCTOS p WHERE descripcion != '' OR codigo != ''`)
 
 	return nil
 }

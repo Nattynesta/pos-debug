@@ -187,6 +187,24 @@ type DashboardReport struct {
 	TicketsAbiertos int     `json:"tickets_abiertos"`
 }
 
+type Pago struct {
+	ID        int     `json:"id"`
+	TicketID  int     `json:"ticket_id"`
+	Metodo    string  `json:"metodo"`
+	Monto     float64 `json:"monto"`
+	Recibido  float64 `json:"recibido"`
+	Cambio    float64 `json:"cambio"`
+	Referencia string `json:"referencia"`
+	Fecha     string  `json:"fecha"`
+}
+
+type PagoRequest struct {
+	Metodo    string  `json:"metodo"`
+	Monto     float64 `json:"monto"`
+	Recibido  float64 `json:"recibido,omitempty"`
+	Referencia string `json:"referencia,omitempty"`
+}
+
 type Pedido struct {
 	ID               int     `json:"id"`
 	Items            string  `json:"items"`
@@ -204,6 +222,67 @@ type Pedido struct {
 	CompletadoOn     string  `json:"completado_on"`
 	CreadoPorNombre  string  `json:"creado_por_nombre"`
 	AsignadoANombre  string  `json:"asignado_a_nombre"`
+}
+
+// --- Pagos ---
+
+func createPago(tx *sql.Tx, ticketID int, p PagoRequest) (int, error) {
+	cambio := 0.0
+	if p.Metodo == "e" && p.Recibido > p.Monto {
+		cambio = p.Recibido - p.Monto
+	}
+	res, err := tx.Exec(
+		`INSERT INTO PAGOS (ticket_id, metodo, monto, recibido, cambio, referencia, fecha) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		ticketID, p.Metodo, p.Monto, p.Recibido, cambio, p.Referencia, now(),
+	)
+	if err != nil {
+		return 0, err
+	}
+	id, _ := res.LastInsertId()
+	return int(id), nil
+}
+
+func listPagos(ticketID int) ([]Pago, error) {
+	rows, err := db.Query(`SELECT id, ticket_id, metodo, monto, COALESCE(recibido,0), COALESCE(cambio,0), COALESCE(referencia,''), fecha FROM PAGOS WHERE ticket_id=? ORDER BY id`, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ps := make([]Pago, 0)
+	for rows.Next() {
+		var p Pago
+		rows.Scan(&p.ID, &p.TicketID, &p.Metodo, &p.Monto, &p.Recibido, &p.Cambio, &p.Referencia, &p.Fecha)
+		ps = append(ps, p)
+	}
+	return ps, nil
+}
+
+func migrateLegacyPagos() {
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM PAGOS").Scan(&count)
+	if count > 0 {
+		return
+	}
+	rows, err := db.Query(`SELECT id, COALESCE(NULLIF(forma_pago,''),'e'), COALESCE(pago_con,0), COALESCE(total_devuelto,0) FROM VENTATICKETS WHERE esta_abierto='f' AND esta_cancelado='f'`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		var metodo string
+		var pagoCon, cambio float64
+		rows.Scan(&id, &metodo, &pagoCon, &cambio)
+		recibido := pagoCon
+		if pagoCon <= 0 {
+			recibido = pagoCon + cambio
+		}
+		monto := pagoCon - cambio
+		if monto < 0 {
+			monto = 0
+		}
+		db.Exec(`INSERT INTO PAGOS (ticket_id, metodo, monto, recibido, cambio, fecha) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(pagado_en, datetime('now','localtime')) FROM VENTATICKETS WHERE id=?))`, id, metodo, monto, recibido, cambio, id)
+	}
 }
 
 func now() string {

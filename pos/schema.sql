@@ -350,6 +350,18 @@ CREATE TABLE IF NOT EXISTS HISTORIAL_USUARIOS (
     FOREIGN KEY (caja_id) REFERENCES CAJAS(id)
 );
 
+CREATE TABLE IF NOT EXISTS PAGOS (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    metodo TEXT NOT NULL,
+    monto REAL NOT NULL,
+    recibido REAL DEFAULT 0,
+    cambio REAL DEFAULT 0,
+    referencia TEXT,
+    fecha TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (ticket_id) REFERENCES VENTATICKETS(id)
+);
+
 CREATE TABLE IF NOT EXISTS PRODUCTOS_OFF (
     codigo TEXT PRIMARY KEY,
     image_url TEXT,
@@ -392,10 +404,30 @@ CREATE TABLE IF NOT EXISTS PEDIDOS_LOG (
     FOREIGN KEY (usuario_id) REFERENCES USUARIOS(id)
 );
 
+CREATE TABLE IF NOT EXISTS chat_canales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL UNIQUE,
+    icono TEXT DEFAULT 'hash',
+    descripcion TEXT DEFAULT '',
+    created_on TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS chat_leidos (
+    usuario_id INTEGER NOT NULL,
+    canal_id INTEGER NOT NULL,
+    ultimo_leido_id INTEGER DEFAULT 0,
+    PRIMARY KEY (usuario_id, canal_id),
+    FOREIGN KEY (usuario_id) REFERENCES USUARIOS(id),
+    FOREIGN KEY (canal_id) REFERENCES chat_canales(id)
+);
+
 CREATE TABLE IF NOT EXISTS CHAT_MESSAGES (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     usuario_id INTEGER NOT NULL,
     mensaje TEXT NOT NULL,
     created_on TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    canal_id INTEGER DEFAULT 1,
+    tipo TEXT DEFAULT '',
+    datos_json TEXT DEFAULT '',
     FOREIGN KEY (usuario_id) REFERENCES USUARIOS(id)
 );

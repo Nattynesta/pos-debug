@@ -80,6 +80,7 @@ type Usuario struct {
 	CreatedOn      string `json:"created_on"`
 	Correo         string `json:"correo"`
 	EstaEnCajaID   *int   `json:"esta_en_caja_id"`
+	Foto           string `json:"foto"`
 }
 
 type Caja struct {

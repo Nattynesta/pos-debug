@@ -36,6 +36,14 @@
     <h2 id="userModalTitle">Nuevo Usuario</h2>
     <form onsubmit="return saveUser(event)">
       <input type="hidden" id="userId">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div id="userFotoPreview" style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:#f3f4f6;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#9ca3af;border:2px dashed #d1d5db;background-size:cover;background-position:center"></div>
+        <div>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('userFotoInput').click()"><i class="ti ti-camera"></i> Foto</button>
+          <input type="file" id="userFotoInput" accept="image/*" style="display:none" onchange="subirFotoUsuario(event)">
+          <div style="font-size:.75rem;color:#9ca3af;margin-top:4px">PNG, JPG. Max 5MB</div>
+        </div>
+      </div>
       <div class="form-group"><label>Usuario *</label><input type="text" id="userUsuario" required></div>
       <div class="form-group"><label>Nombre Completo</label><input type="text" id="userNombre"></div>
       <div class="form-row">
@@ -87,7 +95,7 @@ function loadUsuarios(){
       var activeBadge = u.activo!=='t' ? '<span class="uc-badge inactive">Inactivo</span>' : '';
       return '<div class="user-card">'+
         '<div class="uc-header">'+
-          '<div class="uc-avatar" style="background:'+color+'">'+initials+'</div>'+
+          (u.foto ? '<img src="'+u.foto+'" class="uc-avatar" style="object-fit:cover">' : '<div class="uc-avatar" style="background:'+color+'">'+initials+'</div>')+
           '<div><div class="uc-name">'+(u.nombre_completo||'Sin nombre')+'</div><div class="uc-user">@'+u.usuario+'</div></div>'+
         '</div>'+
         '<div class="uc-detail">'+
@@ -113,6 +121,10 @@ function mostrarFormUsuario(){
   document.getElementById('userRol').value='helper';
   document.getElementById('userActivo').checked=true;
   document.getElementById('pw-field-group').style.display='block';
+  var preview = document.getElementById('userFotoPreview');
+  preview.style.backgroundImage = '';
+  preview.textContent = '?';
+  preview.style.border = '2px dashed #d1d5db';
 }
 function cerrarModal(){ document.getElementById('userModal').style.display='none'; }
 
@@ -131,6 +143,16 @@ function editarUser(id){
     document.getElementById('userRol').value=u.rol||'helper';
     document.getElementById('userActivo').checked = u.activo==='t';
     document.getElementById('pw-field-group').style.display='none';
+    var preview = document.getElementById('userFotoPreview');
+    if(u.foto){
+      preview.style.backgroundImage = 'url('+u.foto+')';
+      preview.textContent = '';
+      preview.style.border = 'none';
+    } else {
+      preview.style.backgroundImage = '';
+      preview.textContent = (u.nombre_completo||u.usuario||'?').charAt(0).toUpperCase();
+      preview.style.border = '2px dashed #d1d5db';
+    }
   });
 }
 
@@ -154,6 +176,25 @@ function saveUser(e){
   fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
   .then(function(r){ if(r.ok){ cerrarModal(); loadUsuarios(); } else r.json().then(function(d){ alert('Error: '+d.error); }); });
   return false;
+}
+
+function subirFotoUsuario(e){
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  var id = document.getElementById('userId').value;
+  if(!id){ alert('Guarda el usuario primero antes de agregar foto'); return; }
+  var form = new FormData();
+  form.append('foto', file);
+  fetch('/api/usuarios/'+id+'/foto', {method:'POST', body:form})
+  .then(function(r){
+    if(r.ok){
+      var preview = document.getElementById('userFotoPreview');
+      preview.style.backgroundImage = 'url('+URL.createObjectURL(file)+')';
+      preview.textContent = '';
+      preview.style.border = 'none';
+      loadUsuarios();
+    } else { alert('Error al subir foto'); }
+  });
 }
 
 function mostrarPwModal(id, usuario){

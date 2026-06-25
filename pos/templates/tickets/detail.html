@@ -122,7 +122,7 @@ fetch('/api/tickets/'+ticketId).then(r=>r.json()).then(function(t){
     var btnCobrar = document.getElementById('btn-cobrar');
     var btnBorrar = document.getElementById('btn-borrar');
     var cobroRow = document.getElementById('td-cobro-row');
-    if(t.esta_cancelado!=='t' && (t.esta_abierto==='t' || esCredito)){
+    if(t.esta_cancelado!=='t' && (t.esta_abierto==='t' || (esCredito && adeudo > 0.005))){
         btnCobrar.style.display = 'inline-flex';
         if(!t.esta_abierto && esCredito && t.pagado_en){
             cobroRow.style.display = 'flex';
@@ -141,18 +141,20 @@ fetch('/api/tickets/'+ticketId).then(r=>r.json()).then(function(t){
 
 function abrirCobroModal(){
     var total = parseFloat(document.getElementById('td-total').textContent.replace('$','')) || 0;
+    var pagado = parseFloat(document.getElementById('td-pago').textContent.replace('$','')) || 0;
+    var cobrar = Math.max(0, total - pagado);
     var folio = document.getElementById('td-folio').textContent;
     var cliente = document.getElementById('td-cliente').textContent;
     var local = document.getElementById('td-local').textContent;
     
     document.getElementById('cm-folio').textContent = '#'+folio;
-    document.getElementById('cm-total').textContent = '$'+total.toFixed(2);
+    document.getElementById('cm-total').textContent = '$'+cobrar.toFixed(2);
     document.getElementById('cm-cliente').textContent = cliente + (local && local!='-' ? ' · '+local : '');
     
-    document.getElementById('cm-recibido').value = '';
+    document.getElementById('cm-recibido').value = cobrar > 0 ? cobrar.toFixed(2) : '';
     document.getElementById('cm-cambio-row').style.display = 'none';
     document.getElementById('cm-faltante').style.display = 'none';
-    document.getElementById('cm-confirmar').disabled = true;
+    document.getElementById('cm-confirmar').disabled = false;
     document.getElementById('cm-forma-pago').value = 'e';
     document.getElementById('cm-referencia').value = '';
     
@@ -165,7 +167,7 @@ function cerrarCobroModal(){
 }
 
 function calcularCambio(){
-    var total = parseFloat(document.getElementById('td-total').textContent.replace('$','')) || 0;
+    var total = parseFloat(document.getElementById('cm-total').textContent.replace('$','')) || 0;
     var recibido = parseFloat(document.getElementById('cm-recibido').value) || 0;
     var cambioRow = document.getElementById('cm-cambio-row');
     var faltante = document.getElementById('cm-faltante');
@@ -181,9 +183,9 @@ function calcularCambio(){
         return;
     }
     
-    if(recibido >= total){
+    if(recibido >= total - 0.005){
         var cambio = recibido - total;
-        document.getElementById('cm-cambio').textContent = '$'+cambio.toFixed(2);
+        document.getElementById('cm-cambio').textContent = '$'+Math.max(0,cambio).toFixed(2);
         cambioRow.style.display = 'flex';
         faltante.style.display = 'none';
         btnConfirm.disabled = false;
@@ -200,9 +202,9 @@ function confirmarCobro(){
     var btn = document.getElementById('cm-confirmar');
     if(btn.disabled) return;
     
-    var total = parseFloat(document.getElementById('td-total').textContent.replace('$','')) || 0;
+    var cobrar = parseFloat(document.getElementById('cm-total').textContent.replace('$','')) || 0;
     var forma = document.getElementById('cm-forma-pago').value;
-    var recibido = forma === 'e' ? (parseFloat(document.getElementById('cm-recibido').value) || 0) : total;
+    var recibido = forma === 'e' ? (parseFloat(document.getElementById('cm-recibido').value) || 0) : cobrar;
     var referencia = document.getElementById('cm-referencia').value.trim();
     
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';

@@ -65,8 +65,16 @@ func validateCSRF(r *http.Request) bool {
 	return hmac.Equal([]byte(expected), []byte(token))
 }
 
+func isCSRFBypass(path string) bool {
+	return strings.HasPrefix(path, "/api/chat/") || strings.HasPrefix(path, "/api/usuarios/") || strings.HasPrefix(path, "/api/tickets")
+}
+
 func withCSRF(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isCSRFBypass(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !validateCSRF(r) {
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				http.Error(w, `{"error":"invalid csrf token"}`, http.StatusForbidden)

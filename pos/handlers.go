@@ -701,7 +701,7 @@ func handleMedidasCreate(w http.ResponseWriter, r *http.Request) {
 // --- Usuarios ---
 
 func handleUsuariosList(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query("SELECT id, COALESCE(nombre_completo,''), COALESCE(direccion,''), COALESCE(telefono,''), usuario, COALESCE(rol,'helper'), COALESCE(activo,'t'), COALESCE(created_on,''), COALESCE(correo,''), esta_en_caja_id FROM USUARIOS ORDER BY usuario")
+	rows, err := db.Query("SELECT id, COALESCE(nombre_completo,''), COALESCE(direccion,''), COALESCE(telefono,''), usuario, COALESCE(rol,'helper'), COALESCE(activo,'t'), COALESCE(created_on,''), COALESCE(correo,''), esta_en_caja_id, COALESCE(foto,'') FROM USUARIOS ORDER BY usuario")
 	if err != nil {
 		jsonErr(w, err.Error(), 500)
 		return
@@ -710,7 +710,7 @@ func handleUsuariosList(w http.ResponseWriter, r *http.Request) {
 	us := make([]Usuario, 0)
 	for rows.Next() {
 		var u Usuario
-		rows.Scan(&u.ID, &u.NombreCompleto, &u.Direccion, &u.Telefono, &u.Usuario, &u.Rol, &u.Activo, &u.CreatedOn, &u.Correo, &u.EstaEnCajaID)
+		rows.Scan(&u.ID, &u.NombreCompleto, &u.Direccion, &u.Telefono, &u.Usuario, &u.Rol, &u.Activo, &u.CreatedOn, &u.Correo, &u.EstaEnCajaID, &u.Foto)
 		us = append(us, u)
 	}
 	if us == nil {
@@ -737,8 +737,8 @@ func handleUsuariosCreate(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Error al generar hash", 500)
 		return
 	}
-	_, err = db.Exec("INSERT INTO USUARIOS (nombre_completo, direccion, telefono, usuario, clave, activo, created_on, correo, rol) VALUES (?,?,?,?,?,?,?,?,?)",
-		u.NombreCompleto, u.Direccion, u.Telefono, u.Usuario, hash, u.Activo, now(), u.Correo, u.Rol)
+	_, err = db.Exec("INSERT INTO USUARIOS (nombre_completo, direccion, telefono, usuario, clave, activo, created_on, correo, rol, foto) VALUES (?,?,?,?,?,?,?,?,?,?)",
+		u.NombreCompleto, u.Direccion, u.Telefono, u.Usuario, hash, u.Activo, now(), u.Correo, u.Rol, u.Foto)
 	if err != nil {
 		jsonErr(w, err.Error(), 400)
 		return
@@ -767,6 +767,67 @@ func handleUsuariosUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResp(w, map[string]string{"ok": "Usuario actualizado"})
+}
+
+func handleUsuarioFoto(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	uid, _, err := validateSession(r)
+	if err != nil {
+		http.Error(w, "No autorizado", http.StatusUnauthorized)
+		return
+	}
+	_ = uid
+
+	err = r.ParseMultipartForm(5 << 20)
+	if err != nil {
+		jsonErr(w, "Archivo demasiado grande (max 5MB)", http.StatusBadRequest)
+		return
+	}
+
+	file, handler, err := r.FormFile("foto")
+	if err != nil {
+		jsonErr(w, "No se recibio archivo", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	contentType := handler.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		jsonErr(w, "Solo se permiten imagenes", http.StatusBadRequest)
+		return
+	}
+
+	ext := filepath.Ext(handler.Filename)
+	if ext == "" {
+		ext = ".jpg"
+	}
+
+	uploadDir := "uploads/usuarios"
+	os.MkdirAll(uploadDir, 0755)
+
+	filename := fmt.Sprintf("user_%s%s", id, ext)
+	fullPath := filepath.Join(uploadDir, filename)
+
+	dst, err := os.Create(fullPath)
+	if err != nil {
+		jsonErr(w, "Error al crear archivo", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		jsonErr(w, "Error al escribir", http.StatusInternalServerError)
+		return
+	}
+
+	fotoURL := "/uploads/usuarios/" + filename
+	_, err = db.Exec("UPDATE USUARIOS SET foto=? WHERE id=?", fotoURL, id)
+	if err != nil {
+		jsonErr(w, "Error DB: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResp(w, map[string]string{"foto": fotoURL})
 }
 
 func handleUsuarioPassword(w http.ResponseWriter, r *http.Request) {
@@ -1389,14 +1450,23 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var estaAbierto string
-	err := db.QueryRow("SELECT esta_abierto FROM VENTATICKETS WHERE id=?", id).Scan(&estaAbierto)
+	var estaAbierto, formaPagoActual string
+	var total, ganancia, pagoCon float64
+	var operacionID int
+	var clienteID sql.NullInt64
+	err := db.QueryRow("SELECT esta_abierto, COALESCE(total,0), COALESCE(ganancia,0), operacion_id, cliente_id, COALESCE(pago_con,0), COALESCE(forma_pago,'') FROM VENTATICKETS WHERE id=?", id).Scan(&estaAbierto, &total, &ganancia, &operacionID, &clienteID, &pagoCon, &formaPagoActual)
 	if err != nil {
 		jsonErr(w, "Ticket no encontrado", 404)
 		return
 	}
-	if estaAbierto != "t" {
+	if estaAbierto != "t" && formaPagoActual != "c" {
 		jsonErr(w, "El ticket ya fue cobrado o cancelado", 400)
+		return
+	}
+
+	restante := total - pagoCon
+	if restante < 0.01 {
+		jsonErr(w, "El ticket ya está saldado", 400)
 		return
 	}
 
@@ -1407,11 +1477,6 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-
-	var total, ganancia float64
-	var operacionID int
-	var clienteID sql.NullInt64
-	tx.QueryRow("SELECT COALESCE(total,0), COALESCE(ganancia,0), operacion_id, cliente_id FROM VENTATICKETS WHERE id=?", id).Scan(&total, &ganancia, &operacionID, &clienteID)
 
 	tid, _ := strconv.Atoi(id)
 
@@ -1436,21 +1501,27 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 			formaPago = p.Metodo
 		}
 	}
-	if sumaMontos < total-0.01 {
-		jsonErr(w, "El total de pagos no cubre el monto", 400)
+	if sumaMontos < restante-0.01 {
+		jsonErr(w, "El total de pagos no cubre el monto restante", 400)
 		return
 	}
 	cambioEfectivo := pagoEfectivoRecibido - pagoEfectivoMonto
 	if cambioEfectivo < 0 {
 		cambioEfectivo = 0
 	}
-	totalCambio := sumaMontos - total
+	totalCambio := sumaMontos - restante
 	if totalCambio < 0 {
 		totalCambio = 0
 	}
+	nuevoPagoCon := pagoCon + sumaMontos
 
-	_, err = tx.Exec(`UPDATE VENTATICKETS SET esta_abierto='f', pagado_en=?, pago_con=?, forma_pago=?, total_devuelto=?, vendido_en=? WHERE id=?`,
-		now(), sumaMontos, formaPago, totalCambio, now(), id)
+	if estaAbierto == "t" {
+		_, err = tx.Exec(`UPDATE VENTATICKETS SET esta_abierto='f', pagado_en=?, pago_con=?, forma_pago=?, total_devuelto=?, vendido_en=? WHERE id=?`,
+			now(), nuevoPagoCon, formaPago, totalCambio, now(), id)
+	} else {
+		_, err = tx.Exec(`UPDATE VENTATICKETS SET pago_con=?, total_devuelto=? WHERE id=?`,
+			nuevoPagoCon, totalCambio, id)
+	}
 	if err != nil {
 		jsonErr(w, err.Error(), 400)
 		return
@@ -1467,10 +1538,18 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	tx.Exec(`UPDATE OPERACIONES SET ventas = ventas + ?, ingresos_efectivo = ingresos_efectivo + ?, ganancias = ganancias + ? WHERE id=?`,
+	_, err = tx.Exec(`UPDATE OPERACIONES SET ventas = ventas + ?, ingresos_efectivo = ingresos_efectivo + ?, ganancias = ganancias + ? WHERE id=?`,
 		total, ingresosEfectivo, ganancia, operacionID)
+	if err != nil {
+		log.Printf("Error updating operacion: %v", err)
+	}
 
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		log.Printf("Error en commit: %v", err)
+		jsonErr(w, "Error al guardar", 500)
+		return
+	}
 	logAudit(db, getUserIDForAudit(r), "ticket_paid", "ticket", tid, fmt.Sprintf("Monto: %.2f, forma: %s", total, formaPago), r.RemoteAddr)
 	jsonResp(w, map[string]string{"ok": "Cobro exitoso", "cambio": fmt.Sprintf("%.2f", cambioEfectivo), "total_pagado": fmt.Sprintf("%.2f", sumaMontos), "ticket_id": id})
 }
@@ -1637,6 +1716,7 @@ func handleTicketDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	tx.Exec("DELETE FROM PAGOS WHERE ticket_id=?", id)
 	tx.Exec("DELETE FROM VENTATICKETS_ARTICULOS WHERE ticket_id=?", id)
 	tx.Exec("DELETE FROM VENTAS WHERE ticket_id=?", id)
 	_, err = tx.Exec("DELETE FROM VENTATICKETS WHERE id=?", id)

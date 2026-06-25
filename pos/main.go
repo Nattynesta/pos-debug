@@ -17,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 //go:embed templates
@@ -156,6 +158,7 @@ func main() {
 	mux.HandleFunc("POST /api/usuarios", handleUsuariosCreate)
 	mux.HandleFunc("PUT /api/usuarios/{id}", handleUsuariosUpdate)
 	mux.HandleFunc("PUT /api/usuarios/{id}/password", handleUsuarioPassword)
+	mux.HandleFunc("POST /api/usuarios/{id}/foto", handleUsuarioFoto)
 
 	mux.HandleFunc("GET /api/cajas", handleCajasList)
 	mux.HandleFunc("GET /api/cajas/default", handleCajaDefault)
@@ -242,6 +245,14 @@ func main() {
 	mux.HandleFunc("GET /usuarios", withAdmin(handleUsuariosPage))
 	mux.HandleFunc("GET /departamentos", withAdmin(handleDepartamentosPage))
 	mux.HandleFunc("GET /pedidos", handlePedidosPage)
+
+	mux.HandleFunc("GET /chat", handleChatPage)
+	mux.HandleFunc("GET /api/chat/messages", handleChatMessages)
+	mux.HandleFunc("POST /api/chat/upload", handleChatUpload)
+	mux.HandleFunc("GET /api/chat/ws", handleChatWS)
+	mux.HandleFunc("DELETE /api/chat/messages/{id}", handleChatDeleteMsg)
+	mux.HandleFunc("DELETE /api/chat/messages", handleChatClearAll)
+	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -481,6 +492,7 @@ func render(w http.ResponseWriter, r *http.Request, name string, data PageData) 
 		var user string
 		db.QueryRow("SELECT u.usuario FROM sessions s JOIN USUARIOS u ON u.id=s.user_id WHERE s.id=?", cookie.Value).Scan(&user)
 		data.User = user
+		db.QueryRow("SELECT s.user_id FROM sessions s WHERE s.id=?", cookie.Value).Scan(&data.UserID)
 	}
 	data.Role = roleFromContext(r.Context())
 	if tokCookie, err := r.Cookie("csrf_token"); err == nil && tokCookie.Value != "" {

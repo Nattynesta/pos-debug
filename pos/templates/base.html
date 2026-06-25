@@ -78,6 +78,7 @@
         {{end}}
         <a href="/pedidos" class="{{if eq .Active "pedidos"}}active{{end}}"><i class="fas fa-clipboard-list"></i> Pedidos</a>
         <a href="/ventas/pos" class="{{if eq .Active "pos"}}active{{end}}"><i class="fas fa-shopping-cart"></i> POS</a>
+        <a href="/chat" class="{{if eq .Active "chat"}}active{{end}}"><i class="fas fa-comments"></i> Chat</a>
         {{if eq .Role "admin"}}
         <a href="/productos" class="{{if eq .Active "productos"}}active{{end}}"><i class="fas fa-box"></i> Productos</a>
         <a href="/clientes" class="{{if eq .Active "clientes"}}active{{end}}"><i class="fas fa-users"></i> Clientes</a>

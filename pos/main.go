@@ -246,7 +246,7 @@ func main() {
 
 	addr := fmt.Sprintf("0.0.0.0:%s", port)
 	log.Printf("Abarrotes PDV corriendo en http://localhost%s", addr)
-	log.Fatal(http.ListenAndServe(addr, withRateLimit(withCSRF(withGzip(withCORS(withAuth(mux)))))))
+	log.Fatal(http.ListenAndServe(addr, withGzip(withRateLimit(withCSRF(withCORS(withAuth(mux)))))))
 }
 
 func migrate(db *sql.DB) error {

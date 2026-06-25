@@ -177,12 +177,16 @@ type DashboardReport struct {
 	VentasHoy       int     `json:"ventas_hoy"`
 	IngresosHoy     float64 `json:"ingresos_hoy"`
 	GananciaHoy     float64 `json:"ganancia_hoy"`
+	MargenHoy       float64 `json:"margen_hoy"`
 	VentasMes       int     `json:"ventas_mes"`
 	IngresosMes     float64 `json:"ingresos_mes"`
+	GananciaMes     float64 `json:"ganancia_mes"`
+	MargenMes       float64 `json:"margen_mes"`
 	ProductosStock  int     `json:"productos_stock"`
 	ValorInventario float64 `json:"valor_inventario"`
 	OperacionActiva bool    `json:"operacion_activa"`
 	TicketsAbiertos int     `json:"tickets_abiertos"`
+	TicketPromedio  float64 `json:"ticket_promedio"`
 }
 
 type Pago struct {

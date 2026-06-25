@@ -201,6 +201,10 @@ func main() {
 	mux.HandleFunc("GET /api/reportes/dashboard", handleReportesDashboard)
 	mux.HandleFunc("GET /api/reportes/ventas-diarias", handleReportesVentasDiarias)
 	mux.HandleFunc("GET /api/reportes/productos-mas-vendidos", handleReportesTopProductos)
+	mux.HandleFunc("GET /api/reportes/metodos-pago", handleReportesMetodosPago)
+	mux.HandleFunc("GET /api/reportes/ventas-por-hora", handleReportesVentasPorHora)
+	mux.HandleFunc("GET /api/reportes/ventas-por-cajero", handleReportesVentasPorCajero)
+	mux.HandleFunc("GET /api/reportes/export-csv", handleReportesExportCSV)
 	mux.HandleFunc("POST /api/admin/reset-ventas", withAdmin(handleAdminResetVentas))
 
 	mux.HandleFunc("POST /api/jobs", requireAuth(handleJobCreate))

@@ -1,41 +1,205 @@
 {{template "base.html" .}}
 {{define "content"}}
 <h1>Reportes</h1>
-<div class="card">
+
+<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+        <div><label style="font-size:12px;color:var(--text3)">Desde</label><input type="date" id="filtro-desde" class="input"></div>
+        <div><label style="font-size:12px;color:var(--text3)">Hasta</label><input type="date" id="filtro-hasta" class="input"></div>
+        <button class="btn" onclick="cargarReportes()" style="padding:8px 20px">Filtrar</button>
+        <div style="display:flex;gap:8px;margin-left:auto">
+            <button class="btn" onclick="exportCSV('ventas-diarias')">CSV Ventas</button>
+            <button class="btn" onclick="exportCSV('top-productos')">CSV Productos</button>
+            <button class="btn" onclick="exportCSV('metodos-pago')">CSV Pagos</button>
+            <button class="btn" onclick="exportCSV('cajeros')">CSV Cajeros</button>
+        </div>
+    </div>
+</div>
+
+<div class="card" id="summary-card">
     <h2>Resumen</h2>
-    <div id="report-summary" class="grid grid-3"></div>
+    <div id="report-summary" class="grid grid-4"></div>
 </div>
+
 <div class="card">
-    <h2>Ventas por Dia (ultimos 30)</h2>
-    <table><thead><tr><th>Dia</th><th>Tickets</th><th>Total</th><th>Ganancia</th></tr></thead>
-    <tbody id="report-ventas-diarias"></tbody></table>
+    <div style="display:flex;gap:16px;border-bottom:2px solid var(--border);margin-bottom:16px">
+        <button class="tab-btn active" data-tab="ventas" onclick="switchTab(this,'ventas')">Ventas Diarias</button>
+        <button class="tab-btn" data-tab="top" onclick="switchTab(this,'top')">Top Productos</button>
+        <button class="tab-btn" data-tab="pagos" onclick="switchTab(this,'pagos')">Metodos de Pago</button>
+        <button class="tab-btn" data-tab="hora" onclick="switchTab(this,'hora')">Ventas por Hora</button>
+        <button class="tab-btn" data-tab="cajeros" onclick="switchTab(this,'cajeros')">Ventas por Cajero</button>
+    </div>
+
+    <div id="tab-ventas" class="tab-content active">
+        <h2>Ventas por Dia</h2>
+        <div style="max-width:100%;height:280px"><canvas id="chart-ventas"></canvas></div>
+        <div style="overflow-x:auto;margin-top:16px">
+            <table><thead><tr><th>Dia</th><th>Tickets</th><th>Total</th><th>Ganancia</th><th>Margen</th></tr></thead>
+            <tbody id="report-ventas-diarias"></tbody></table>
+        </div>
+    </div>
+
+    <div id="tab-top" class="tab-content">
+        <h2>Productos Mas Vendidos</h2>
+        <div style="max-width:100%;height:280px"><canvas id="chart-top"></canvas></div>
+        <table><thead><tr><th>#</th><th>Producto</th><th>Vendidos</th><th>Total</th></tr></thead>
+        <tbody id="report-top-productos"></tbody></table>
+    </div>
+
+    <div id="tab-pagos" class="tab-content">
+        <h2>Metodos de Pago</h2>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+            <div style="max-width:300px;height:280px"><canvas id="chart-pagos"></canvas></div>
+            <div><table><thead><tr><th>Metodo</th><th>Ventas</th><th>Total</th></tr></thead>
+            <tbody id="report-metodos-pago"></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="tab-hora" class="tab-content">
+        <h2>Ventas por Hora</h2>
+        <div style="max-width:100%;height:280px"><canvas id="chart-hora"></canvas></div>
+        <table><thead><tr><th>Hora</th><th>Tickets</th><th>Total</th></tr></thead>
+        <tbody id="report-ventas-hora"></tbody></table>
+    </div>
+
+    <div id="tab-cajeros" class="tab-content">
+        <h2>Ventas por Cajero</h2>
+        <table><thead><tr><th>Cajero</th><th>Tickets</th><th>Total</th><th>Ganancia</th></tr></thead>
+        <tbody id="report-ventas-cajero"></tbody></table>
+    </div>
 </div>
-<div class="card">
-    <h2>Productos Mas Vendidos</h2>
-    <table><thead><tr><th>#</th><th>Producto</th><th>Vendidos</th><th>Total</th></tr></thead>
-    <tbody id="report-top-productos"></tbody></table>
-</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-fetch('/api/reportes/dashboard').then(r=>r.json()).then(function(d){
-    document.getElementById('report-summary').innerHTML =
-        '<div class="card stat"><div class="value">'+d.ventas_mes+'</div><div class="label">Ventas del Mes</div></div>'+
-        '<div class="card stat"><div class="value">$'+d.ingresos_mes.toFixed(2)+'</div><div class="label">Ingresos del Mes</div></div>'+
-        '<div class="card stat" onclick="mostrarValorInv(this)" style="cursor:pointer"><div class="value" id="invValor">******</div><div class="label">Valor Inventario <small style="color:var(--text3)">(click)</small></div></div>';
-});
-function mostrarValorInv(el){
-  var d = document.getElementById('invValor');
-  fetch('/api/reportes/dashboard').then(function(r){return r.json();}).then(function(dd){
-    d.textContent = '$'+dd.valor_inventario.toFixed(2);
-    setTimeout(function(){ d.textContent = '******'; }, 5000);
-  });
+var charts = {};
+
+function switchTab(btn, tab) {
+    document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+    document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active');});
+    btn.classList.add('active');
+    document.getElementById('tab-'+tab).classList.add('active');
 }
-fetch('/api/reportes/ventas-diarias').then(r=>r.json()).then(function(rs){
-    var tbody = document.getElementById('report-ventas-diarias');
-    tbody.innerHTML = rs.map(function(r){ return '<tr><td>'+r.dia+'</td><td>'+r.tickets+'</td><td>$'+r.total.toFixed(2)+'</td><td>$'+r.ganancia.toFixed(2)+'</td></tr>'; }).join('');
-});
-fetch('/api/reportes/productos-mas-vendidos').then(r=>r.json()).then(function(ps){
-    var tbody = document.getElementById('report-top-productos');
-    tbody.innerHTML = ps.map(function(p,i){ return '<tr><td>'+(i+1)+'</td><td>'+p.nombre+'</td><td>'+p.vendidos+'</td><td>$'+p.total.toFixed(2)+'</td></tr>'; }).join('');
-});
+
+function valorInv() {
+    fetch('/api/reportes/dashboard').then(function(r){return r.json();}).then(function(d){
+        var el = document.getElementById('invValor');
+        if(el) { el.textContent = '$'+d.valor_inventario.toFixed(2);
+            setTimeout(function(){ if(el) el.textContent = '******'; }, 5000); }
+    });
+}
+
+function renderChart(id, type, labels, data, label, color) {
+    if(charts[id]) charts[id].destroy();
+    var ctx = document.getElementById(id);
+    if(!ctx) return;
+    charts[id] = new Chart(ctx, {
+        type: type,
+        data: {
+            labels: labels,
+            datasets: [{ label: label, data: data, backgroundColor: color || 'rgba(59,130,246,0.6)', borderColor: '#3b82f6', borderWidth: 1 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+}
+
+function renderDoughnut(id, labels, data, colors) {
+    if(charts[id]) charts[id].destroy();
+    var ctx = document.getElementById(id);
+    if(!ctx) return;
+    charts[id] = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{ data: data, backgroundColor: colors || ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+}
+
+function getFechas() {
+    var d = document.getElementById('filtro-desde').value;
+    var h = document.getElementById('filtro-hasta').value;
+    var q = '';
+    if(d) q += '&desde='+d;
+    if(h) q += '&hasta='+h;
+    return q;
+}
+
+function exportCSV(tipo) {
+    var q = getFechas();
+    window.open('/api/reportes/export-csv?tipo='+tipo+q, '_blank');
+}
+
+function cargarReportes() {
+    var q = getFechas();
+
+    fetch('/api/reportes/dashboard').then(function(r){return r.json();}).then(function(d){
+        document.getElementById('report-summary').innerHTML =
+            '<div class="stat"><div class="value">'+d.ventas_mes+'</div><div class="label">Ventas del Mes</div></div>'+
+            '<div class="stat"><div class="value">$'+d.ingresos_mes.toFixed(2)+'</div><div class="label">Ingresos del Mes</div></div>'+
+            '<div class="stat"><div class="value">'+d.margen_mes.toFixed(1)+'%</div><div class="label">Margen Mensual</div></div>'+
+            '<div class="stat"><div class="value">$'+d.ingresos_hoy.toFixed(0)+'</div><div class="label">Hoy</div></div>'+
+            '<div class="stat"><div class="value">'+d.ventas_hoy+'</div><div class="label">Tickets Hoy</div></div>'+
+            '<div class="stat"><div class="value">$'+d.ticket_promedio.toFixed(2)+'</div><div class="label">Ticket Promedio</div></div>'+
+            '<div class="stat"><div class="value">'+d.productos_stock+'</div><div class="label">Productos Stock</div></div>'+
+            '<div class="stat"><div class="value" id="invValor" style="cursor:pointer" onclick="valorInv()">******</div><div class="label">Valor Inventario</div></div>';
+    });
+
+    fetch('/api/reportes/ventas-diarias'+q).then(function(r){return r.json();}).then(function(rs){
+        document.getElementById('report-ventas-diarias').innerHTML = rs.map(function(r){
+            var margen = r.total > 0 ? (r.ganancia/r.total*100).toFixed(1) : '0.0';
+            return '<tr><td>'+r.dia+'</td><td>'+r.tickets+'</td><td>$'+r.total.toFixed(2)+'</td><td>$'+r.ganancia.toFixed(2)+'</td><td>'+margen+'%</td></tr>';
+        }).join('');
+        if(rs.length) {
+            renderChart('chart-ventas','bar', rs.map(function(r){return r.dia;}).reverse(), rs.map(function(r){return r.total;}).reverse(), 'Ventas', 'rgba(59,130,246,0.6)');
+        }
+    });
+
+    fetch('/api/reportes/productos-mas-vendidos'+q).then(function(r){return r.json();}).then(function(ps){
+        document.getElementById('report-top-productos').innerHTML = ps.map(function(p,i){
+            return '<tr><td>'+(i+1)+'</td><td>'+p.nombre+'</td><td>'+p.vendidos+'</td><td>$'+p.total.toFixed(2)+'</td></tr>';
+        }).join('');
+        if(ps.length) {
+            renderChart('chart-top','bar', ps.map(function(p){return p.nombre;}), ps.map(function(p){return p.vendidos;}), 'Vendidos', 'rgba(16,185,129,0.6)');
+        }
+    });
+
+    fetch('/api/reportes/metodos-pago'+q).then(function(r){return r.json();}).then(function(ps){
+        document.getElementById('report-metodos-pago').innerHTML = ps.map(function(p){
+            return '<tr><td>'+p.nombre+'</td><td>'+p.cantidad+'</td><td>$'+p.total.toFixed(2)+'</td></tr>';
+        }).join('');
+        if(ps.length) {
+            renderDoughnut('chart-pagos', ps.map(function(p){return p.nombre;}), ps.map(function(p){return p.total;}));
+        }
+    });
+
+    fetch('/api/reportes/ventas-por-hora'+q).then(function(r){return r.json();}).then(function(rs){
+        document.getElementById('report-ventas-hora').innerHTML = rs.map(function(r){
+            var h = r.hora+':00';
+            return '<tr><td>'+h+'</td><td>'+r.tickets+'</td><td>$'+r.total.toFixed(2)+'</td></tr>';
+        }).join('');
+        if(rs.length) {
+            renderChart('chart-hora','line', rs.map(function(r){return r.hora+':00';}), rs.map(function(r){return r.total;}), 'Ventas', 'rgba(245,158,11,0.6)');
+        }
+    });
+
+    fetch('/api/reportes/ventas-por-cajero'+q).then(function(r){return r.json();}).then(function(rs){
+        document.getElementById('report-ventas-cajero').innerHTML = rs.map(function(r){
+            return '<tr><td>'+r.nombre+'</td><td>'+r.tickets+'</td><td>$'+r.total.toFixed(2)+'</td><td>$'+r.ganancia.toFixed(2)+'</td></tr>';
+        }).join('');
+    });
+}
+
+cargarReportes();
 </script>
+
+<style>
+.tab-btn { padding:8px 16px; background:none; border:none; cursor:pointer; color:var(--text3); font-size:14px; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .2s }
+.tab-btn.active { color:var(--accent); border-bottom-color:var(--accent) }
+.tab-content { display:none }
+.tab-content.active { display:block }
+.stat { padding:8px; min-width:130px }
+.stat .value { font-size:22px; font-weight:700; color:var(--accent) }
+.stat .label { font-size:12px; color:var(--text3) }
+</style>
 {{end}}

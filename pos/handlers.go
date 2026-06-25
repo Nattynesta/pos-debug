@@ -1900,8 +1900,18 @@ func handleReportesDashboard(w http.ResponseWriter, r *http.Request) {
 	db.QueryRow(`SELECT COUNT(*) FROM VENTATICKETS WHERE DATE(creado_en)=DATE('now')`).Scan(&d.VentasHoy)
 	db.QueryRow(`SELECT COALESCE(SUM(total),0) FROM VENTATICKETS WHERE DATE(creado_en)=DATE('now') AND esta_cancelado='f'`).Scan(&d.IngresosHoy)
 	db.QueryRow(`SELECT COALESCE(SUM(ganancia),0) FROM VENTATICKETS WHERE DATE(creado_en)=DATE('now') AND esta_cancelado='f'`).Scan(&d.GananciaHoy)
+	if d.IngresosHoy > 0 {
+		d.MargenHoy = d.GananciaHoy / d.IngresosHoy * 100
+	}
 	db.QueryRow(`SELECT COUNT(*) FROM VENTATICKETS WHERE strftime('%Y-%m', creado_en)=strftime('%Y-%m','now')`).Scan(&d.VentasMes)
 	db.QueryRow(`SELECT COALESCE(SUM(total),0) FROM VENTATICKETS WHERE strftime('%Y-%m', creado_en)=strftime('%Y-%m','now') AND esta_cancelado='f'`).Scan(&d.IngresosMes)
+	db.QueryRow(`SELECT COALESCE(SUM(ganancia),0) FROM VENTATICKETS WHERE strftime('%Y-%m', creado_en)=strftime('%Y-%m','now') AND esta_cancelado='f'`).Scan(&d.GananciaMes)
+	if d.IngresosMes > 0 {
+		d.MargenMes = d.GananciaMes / d.IngresosMes * 100
+	}
+	if d.VentasHoy > 0 {
+		d.TicketPromedio = d.IngresosHoy / float64(d.VentasHoy)
+	}
 	db.QueryRow(`SELECT COUNT(*) FROM PRODUCTOS WHERE COALESCE(dinventario,0) > 0`).Scan(&d.ProductosStock)
 	db.QueryRow(`SELECT COALESCE(SUM(dinventario * pcosto),0) FROM PRODUCTOS WHERE COALESCE(dinventario,0) > 0`).Scan(&d.ValorInventario)
 
@@ -1914,8 +1924,21 @@ func handleReportesDashboard(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, d)
 }
 
+func dateFilter(r *http.Request) (string, string) {
+	desde := r.URL.Query().Get("desde")
+	hasta := r.URL.Query().Get("hasta")
+	if desde == "" {
+		desde = "1970-01-01"
+	}
+	if hasta == "" {
+		hasta = "2099-12-31"
+	}
+	return desde, hasta
+}
+
 func handleReportesVentasDiarias(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(`SELECT DATE(creado_en) as dia, COUNT(*) as tickets, COALESCE(SUM(total),0) as total, COALESCE(SUM(ganancia),0) as ganancia FROM VENTATICKETS WHERE esta_cancelado='f' GROUP BY DATE(creado_en) ORDER BY dia DESC LIMIT 30`)
+	desde, hasta := dateFilter(r)
+	rows, err := db.Query(`SELECT DATE(creado_en) as dia, COUNT(*) as tickets, COALESCE(SUM(total),0) as total, COALESCE(SUM(ganancia),0) as ganancia FROM VENTATICKETS WHERE esta_cancelado='f' AND DATE(creado_en) >= ? AND DATE(creado_en) <= ? GROUP BY DATE(creado_en) ORDER BY dia DESC LIMIT 90`, desde, hasta)
 	if err != nil {
 		jsonErr(w, err.Error(), 500)
 		return
@@ -1936,7 +1959,8 @@ func handleReportesVentasDiarias(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleReportesTopProductos(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(`SELECT a.producto_nombre, SUM(a.cantidad) as vendidos, SUM(a.cantidad * a.precio_usado) as total FROM VENTATICKETS_ARTICULOS a JOIN VENTATICKETS t ON t.id=a.ticket_id WHERE t.esta_cancelado='f' GROUP BY a.producto_nombre ORDER BY vendidos DESC LIMIT 20`)
+	desde, hasta := dateFilter(r)
+	rows, err := db.Query(`SELECT a.producto_nombre, SUM(a.cantidad) as vendidos, SUM(a.cantidad * a.precio_usado) as total FROM VENTATICKETS_ARTICULOS a JOIN VENTATICKETS t ON t.id=a.ticket_id WHERE t.esta_cancelado='f' AND DATE(t.creado_en) >= ? AND DATE(t.creado_en) <= ? GROUP BY a.producto_nombre ORDER BY vendidos DESC LIMIT 20`, desde, hasta)
 	if err != nil {
 		jsonErr(w, err.Error(), 500)
 		return
@@ -1953,6 +1977,152 @@ func handleReportesTopProductos(w http.ResponseWriter, r *http.Request) {
 		rs = []map[string]interface{}{}
 	}
 	jsonResp(w, rs)
+}
+
+func handleReportesMetodosPago(w http.ResponseWriter, r *http.Request) {
+	desde, hasta := dateFilter(r)
+	rows, err := db.Query(`SELECT COALESCE(p.metodo,'e') as metodo, COUNT(*) as cantidad, COALESCE(SUM(p.monto),0) as total FROM PAGOS p JOIN VENTATICKETS t ON t.id=p.ticket_id WHERE t.esta_cancelado='f' AND DATE(t.creado_en) >= ? AND DATE(t.creado_en) <= ? GROUP BY p.metodo ORDER BY total DESC`, desde, hasta)
+	if err != nil {
+		rows2, err2 := db.Query(`SELECT COALESCE(forma_pago,'e') as metodo, COUNT(*) as cantidad, COALESCE(SUM(total),0) as total FROM VENTATICKETS WHERE esta_cancelado='f' AND DATE(creado_en) >= ? AND DATE(creado_en) <= ? GROUP BY forma_pago ORDER BY total DESC`, desde, hasta)
+		if err2 != nil {
+			jsonErr(w, err2.Error(), 500)
+			return
+		}
+		rows = rows2
+	}
+	defer rows.Close()
+	metodos := map[string]string{"e": "Efectivo", "t": "Tarjeta", "v": "Vales", "c": "Credito", "x": "Transferencia"}
+	rs := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var metodo string
+		var cantidad int
+		var total float64
+		rows.Scan(&metodo, &cantidad, &total)
+		nombre := metodo
+		if n, ok := metodos[metodo]; ok {
+			nombre = n
+		}
+		rs = append(rs, map[string]interface{}{"metodo": metodo, "nombre": nombre, "cantidad": cantidad, "total": total})
+	}
+	if rs == nil {
+		rs = []map[string]interface{}{}
+	}
+	jsonResp(w, rs)
+}
+
+func handleReportesVentasPorHora(w http.ResponseWriter, r *http.Request) {
+	desde, hasta := dateFilter(r)
+	rows, err := db.Query(`SELECT CAST(strftime('%H', creado_en) AS INTEGER) as hora, COUNT(*) as tickets, COALESCE(SUM(total),0) as total FROM VENTATICKETS WHERE esta_cancelado='f' AND DATE(creado_en) >= ? AND DATE(creado_en) <= ? GROUP BY hora ORDER BY hora`, desde, hasta)
+	if err != nil {
+		jsonErr(w, err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+	rs := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var hora, tickets int
+		var total float64
+		rows.Scan(&hora, &tickets, &total)
+		rs = append(rs, map[string]interface{}{"hora": hora, "tickets": tickets, "total": total})
+	}
+	if rs == nil {
+		rs = []map[string]interface{}{}
+	}
+	jsonResp(w, rs)
+}
+
+func handleReportesVentasPorCajero(w http.ResponseWriter, r *http.Request) {
+	desde, hasta := dateFilter(r)
+	rows, err := db.Query(`SELECT COALESCE(u.nombre_completo, u.usuario, '?') as nombre, COUNT(*) as tickets, COALESCE(SUM(t.total),0) as total, COALESCE(SUM(t.ganancia),0) as ganancia FROM VENTATICKETS t LEFT JOIN USUARIOS u ON u.id=t.cajero_id WHERE t.esta_cancelado='f' AND DATE(t.creado_en) >= ? AND DATE(t.creado_en) <= ? GROUP BY t.cajero_id ORDER BY total DESC`, desde, hasta)
+	if err != nil {
+		jsonErr(w, err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+	rs := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var nombre string
+		var tickets int
+		var total, ganancia float64
+		rows.Scan(&nombre, &tickets, &total, &ganancia)
+		rs = append(rs, map[string]interface{}{"nombre": nombre, "tickets": tickets, "total": total, "ganancia": ganancia})
+	}
+	if rs == nil {
+		rs = []map[string]interface{}{}
+	}
+	jsonResp(w, rs)
+}
+
+func handleReportesExportCSV(w http.ResponseWriter, r *http.Request) {
+	tipo := r.URL.Query().Get("tipo")
+	desde, hasta := dateFilter(r)
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=reporte_"+tipo+"_"+desde+"_"+hasta+".csv")
+
+	switch tipo {
+	case "ventas-diarias":
+		w.Write([]byte("Dia,Tickets,Total,Ganancia\n"))
+		rows, err := db.Query(`SELECT DATE(creado_en) as dia, COUNT(*), COALESCE(SUM(total),0), COALESCE(SUM(ganancia),0) FROM VENTATICKETS WHERE esta_cancelado='f' AND DATE(creado_en) >= ? AND DATE(creado_en) <= ? GROUP BY DATE(creado_en) ORDER BY dia`, desde, hasta)
+		if err != nil {
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var dia string
+			var tickets int
+			var total, ganancia float64
+			rows.Scan(&dia, &tickets, &total, &ganancia)
+			w.Write([]byte(fmt.Sprintf("%s,%d,%.2f,%.2f\n", dia, tickets, total, ganancia)))
+		}
+	case "top-productos":
+		w.Write([]byte("Producto,Vendidos,Total\n"))
+		rows, err := db.Query(`SELECT a.producto_nombre, SUM(a.cantidad), SUM(a.cantidad * a.precio_usado) FROM VENTATICKETS_ARTICULOS a JOIN VENTATICKETS t ON t.id=a.ticket_id WHERE t.esta_cancelado='f' AND DATE(t.creado_en) >= ? AND DATE(t.creado_en) <= ? GROUP BY a.producto_nombre ORDER BY SUM(a.cantidad) DESC`, desde, hasta)
+		if err != nil {
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var nombre string
+			var vendidos, total float64
+			rows.Scan(&nombre, &vendidos, &total)
+			w.Write([]byte(fmt.Sprintf("%s,%.0f,%.2f\n", nombre, vendidos, total)))
+		}
+	case "metodos-pago":
+		w.Write([]byte("Metodo,Cantidad,Total\n"))
+		metodos := map[string]string{"e": "Efectivo", "t": "Tarjeta", "v": "Vales", "c": "Credito", "x": "Transferencia"}
+		rows, err := db.Query(`SELECT COALESCE(forma_pago,'e'), COUNT(*), COALESCE(SUM(total),0) FROM VENTATICKETS WHERE esta_cancelado='f' AND DATE(creado_en) >= ? AND DATE(creado_en) <= ? GROUP BY forma_pago`, desde, hasta)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var metodo string
+				var cantidad int
+				var total float64
+				rows.Scan(&metodo, &cantidad, &total)
+				nombre := metodo
+				if n, ok := metodos[metodo]; ok {
+					nombre = n
+				}
+				w.Write([]byte(fmt.Sprintf("%s,%d,%.2f\n", nombre, cantidad, total)))
+			}
+		}
+	case "cajeros":
+		w.Write([]byte("Cajero,Tickets,Total,Ganancia\n"))
+		rows, err := db.Query(`SELECT COALESCE(u.nombre_completo,u.usuario,'?'), COUNT(*), COALESCE(SUM(t.total),0), COALESCE(SUM(t.ganancia),0) FROM VENTATICKETS t LEFT JOIN USUARIOS u ON u.id=t.cajero_id WHERE t.esta_cancelado='f' AND DATE(t.creado_en) >= ? AND DATE(t.creado_en) <= ? GROUP BY t.cajero_id ORDER BY SUM(t.total) DESC`, desde, hasta)
+		if err != nil {
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var nombre string
+			var tickets int
+			var total, ganancia float64
+			rows.Scan(&nombre, &tickets, &total, &ganancia)
+			w.Write([]byte(fmt.Sprintf("%s,%d,%.2f,%.2f\n", nombre, tickets, total, ganancia)))
+		}
+	default:
+		w.Write([]byte("tipo no valido"))
+	}
 }
 
 func handleAdminResetVentas(w http.ResponseWriter, r *http.Request) {

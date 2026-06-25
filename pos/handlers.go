@@ -58,12 +58,14 @@ func handleProductosList(w http.ResponseWriter, r *http.Request) {
 			db.QueryRow(`SELECT COUNT(*) FROM PRODUCTOS p JOIN productos_fts fts ON p.codigo = fts.codigo WHERE productos_fts MATCH ?`, searchArg).Scan(&total)
 		}
 
-		rows, err = db.Query(`
+		query := `
 			SELECT p.codigo, p.descripcion, p.tventa, COALESCE(p.pcosto,0), COALESCE(p.pventa,0),
 			p.dept, p.provid, p.umedida, COALESCE(p.mayoreo,0), p.iprioridad,
 			COALESCE(p.dinventario,0), COALESCE(p.dinvminimo,0), COALESCE(p.dinvmaximo,0),
 			COALESCE(p.checado_en,''), COALESCE(p.porcentaje_ganancia,0), COALESCE(p.componentes,''), COALESCE(p.impuestos,''),
 			COALESCE(p.imagen_local,''),
+			COALESCE(p.imagen_local,''),
+			COALESCE(p.imagen_thumb,''),
 			COALESCE(p.marca, o.marca), COALESCE(p.categorias, o.categorias),
 			COALESCE(p.ingredientes, o.ingredientes), COALESCE(p.nutriscore, o.nutriscore),
 			COALESCE(p.cantidad_presentacion, o.cantidad_presentacion), COALESCE(p.nutricion, o.nutricion),
@@ -73,18 +75,25 @@ func handleProductosList(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN productos_openfoods o ON p.codigo = o.codigo
 			JOIN productos_fts fts ON p.codigo = fts.codigo
 			WHERE productos_fts MATCH ?
-			ORDER BY rank`, searchArg)
+			ORDER BY rank`
+		if hasPage {
+			query += ` LIMIT ? OFFSET ?`
+			rows, err = db.Query(query, searchArg, p.Limit, p.Offset)
+		} else {
+			rows, err = db.Query(query, searchArg)
+		}
 	} else {
 		if hasPage {
 			db.QueryRow(`SELECT COUNT(*) FROM PRODUCTOS`).Scan(&total)
 		}
 
-		rows, err = db.Query(`
+		query := `
 			SELECT p.codigo, p.descripcion, p.tventa, COALESCE(p.pcosto,0), COALESCE(p.pventa,0),
 			p.dept, p.provid, p.umedida, COALESCE(p.mayoreo,0), p.iprioridad,
 			COALESCE(p.dinventario,0), COALESCE(p.dinvminimo,0), COALESCE(p.dinvmaximo,0),
 			COALESCE(p.checado_en,''), COALESCE(p.porcentaje_ganancia,0), COALESCE(p.componentes,''), COALESCE(p.impuestos,''),
 			COALESCE(p.imagen_local,''),
+			COALESCE(p.imagen_thumb,''),
 			COALESCE(p.marca, o.marca), COALESCE(p.categorias, o.categorias),
 			COALESCE(p.ingredientes, o.ingredientes), COALESCE(p.nutriscore, o.nutriscore),
 			COALESCE(p.cantidad_presentacion, o.cantidad_presentacion), COALESCE(p.nutricion, o.nutricion),
@@ -92,7 +101,13 @@ func handleProductosList(w http.ResponseWriter, r *http.Request) {
 			COALESCE(o.imagen_grande, ''), COALESCE(o.nombre, '')
 			FROM PRODUCTOS p
 			LEFT JOIN productos_openfoods o ON p.codigo = o.codigo
-			ORDER BY p.descripcion`)
+			ORDER BY p.descripcion`
+		if hasPage {
+			query += ` LIMIT ? OFFSET ?`
+			rows, err = db.Query(query, p.Limit, p.Offset)
+		} else {
+			rows, err = db.Query(query)
+		}
 	}
 
 	if err != nil {
@@ -104,7 +119,10 @@ func handleProductosList(w http.ResponseWriter, r *http.Request) {
 	ps := make([]Producto, 0)
 	for rows.Next() {
 		var pr Producto
-		rows.Scan(&pr.Codigo, &pr.Descripcion, &pr.Tventa, &pr.Pcosto, &pr.Pventa, &pr.Dept, &pr.Provid, &pr.Umedida, &pr.Mayoreo, &pr.Iprioridad, &pr.Dinventario, &pr.Dinvminimo, &pr.Dinvmaximo, &pr.ChecadoEn, &pr.PorcentajeGanancia, &pr.Componentes, &pr.Impuestos, &pr.ImagenLocal, &pr.Marca, &pr.Categorias, &pr.Ingredientes, &pr.Nutriscore, &pr.CantidadPresentacion, &pr.Nutricion, &pr.OffImageUrl, &pr.OffImageSmall, &pr.OffImageGrande, &pr.OffName)
+		rows.Scan(&pr.Codigo, &pr.Descripcion, &pr.Tventa, &pr.Pcosto, &pr.Pventa, &pr.Dept, &pr.Provid, &pr.Umedida, &pr.Mayoreo, &pr.Iprioridad, &pr.Dinventario, &pr.Dinvminimo, &pr.Dinvmaximo, &pr.ChecadoEn, &pr.PorcentajeGanancia, &pr.Componentes, &pr.Impuestos, &pr.ImagenLocal, &pr.ImagenThumb, &pr.Marca, &pr.Categorias, &pr.Ingredientes, &pr.Nutriscore, &pr.CantidadPresentacion, &pr.Nutricion, &pr.OffImageUrl, &pr.OffImageSmall, &pr.OffImageGrande, &pr.OffName)
+		if pr.ImagenThumb == "" && pr.ImagenLocal != "" {
+			pr.ImagenThumb = thumbnailURL(pr.Codigo, pr.ImagenLocal)
+		}
 		ps = append(ps, pr)
 	}
 	if hasPage {
@@ -225,6 +243,7 @@ func handleProductosGet(w http.ResponseWriter, r *http.Request) {
 			COALESCE(p.dinventario,0), COALESCE(p.dinvminimo,0), COALESCE(p.dinvmaximo,0), 
 			COALESCE(p.checado_en,''), COALESCE(p.porcentaje_ganancia,0), COALESCE(p.componentes,''), COALESCE(p.impuestos,''),
 			COALESCE(p.imagen_local,''),
+			COALESCE(p.imagen_thumb,''),
 			COALESCE(p.marca, o.marca),
 			COALESCE(p.categorias, o.categorias),
 			COALESCE(p.ingredientes, o.ingredientes),
@@ -237,7 +256,10 @@ func handleProductosGet(w http.ResponseWriter, r *http.Request) {
 			COALESCE(o.nombre, '')
 		FROM PRODUCTOS p
 		LEFT JOIN productos_openfoods o ON p.codigo = o.codigo
-		WHERE p.codigo=?`, codigo).Scan(&p.Codigo, &p.Descripcion, &p.Tventa, &p.Pcosto, &p.Pventa, &p.Dept, &p.Provid, &p.Umedida, &p.Mayoreo, &p.Iprioridad, &p.Dinventario, &p.Dinvminimo, &p.Dinvmaximo, &p.ChecadoEn, &p.PorcentajeGanancia, &p.Componentes, &p.Impuestos, &p.ImagenLocal, &p.Marca, &p.Categorias, &p.Ingredientes, &p.Nutriscore, &p.CantidadPresentacion, &p.Nutricion, &p.OffImageUrl, &p.OffImageSmall, &p.OffImageGrande, &p.OffName)
+		WHERE p.codigo=?`, codigo).Scan(&p.Codigo, &p.Descripcion, &p.Tventa, &p.Pcosto, &p.Pventa, &p.Dept, &p.Provid, &p.Umedida, &p.Mayoreo, &p.Iprioridad, &p.Dinventario, &p.Dinvminimo, &p.Dinvmaximo, &p.ChecadoEn, &p.PorcentajeGanancia, &p.Componentes, &p.Impuestos, &p.ImagenLocal, &p.ImagenThumb, &p.Marca, &p.Categorias, &p.Ingredientes, &p.Nutriscore, &p.CantidadPresentacion, &p.Nutricion, &p.OffImageUrl, &p.OffImageSmall, &p.OffImageGrande, &p.OffName)
+	if p.ImagenThumb == "" && p.ImagenLocal != "" {
+		p.ImagenThumb = thumbnailURL(p.Codigo, p.ImagenLocal)
+	}
 	if err == sql.ErrNoRows {
 		jsonErr(w, "Producto no encontrado", 404)
 		return
@@ -319,6 +341,10 @@ func handleProductoUploadImagen(w http.ResponseWriter, r *http.Request) {
 	file.Seek(0, 0)
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
+	// Convert webp to jpg
+	if ext == ".webp" {
+		ext = ".jpg"
+	}
 	nombre := codigo + ext
 	ruta := filepath.Join("static", "img", "productos", nombre)
 
@@ -341,16 +367,28 @@ func handleProductoUploadImagen(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Error interno", 500)
 		return
 	}
+	dst.Close()
+
+	compressImage(ruta)
 
 	url := "/static/img/productos/" + nombre
-	_, err = db.Exec("UPDATE PRODUCTOS SET imagen_local=? WHERE codigo=?", url, codigo)
+	thumbURL := "/static/img/productos/thumbs/" + nombre
+	thumbPath := filepath.Join("static", "img", "productos", "thumbs", nombre)
+
+	if err := createThumbnail(ruta, thumbPath); err != nil {
+		log.Printf("Error creando thumbnail: %v", err)
+	}
+
+	_, err = db.Exec("UPDATE PRODUCTOS SET imagen_local=?, imagen_thumb=? WHERE codigo=?", url, thumbURL, codigo)
 	if err != nil {
 		log.Printf("Error actualizando BD: %v", err)
 		jsonErr(w, "Error interno", 500)
 		return
 	}
 
-	jsonResp(w, map[string]string{"ok": "Imagen subida", "url": url})
+	appCache.Delete("categorias_list")
+
+	jsonResp(w, map[string]string{"ok": "Imagen subida", "url": url, "thumb": thumbURL})
 }
 
 // --- Clientes ---
@@ -368,12 +406,24 @@ func handleClientesList(w http.ResponseWriter, r *http.Request) {
 		if hasPage {
 			db.QueryRow(`SELECT COUNT(*) FROM CLIENTES WHERE nombre LIKE ? OR telefono LIKE ?`, "%"+search+"%", "%"+search+"%").Scan(&total)
 		}
-		rows, err = db.Query(`SELECT numero, COALESCE(nombre,''), COALESCE(direccion,''), COALESCE(telefono,''), COALESCE(dsaldoactual,0), COALESCE(dtactualizasaldo,''), COALESCE(limite_credito,0), COALESCE(ultimo_pago_en,''), COALESCE(folio,0) FROM CLIENTES WHERE nombre LIKE ? OR telefono LIKE ? ORDER BY nombre`, "%"+search+"%", "%"+search+"%")
+		q := `SELECT numero, COALESCE(nombre,''), COALESCE(direccion,''), COALESCE(telefono,''), COALESCE(dsaldoactual,0), COALESCE(dtactualizasaldo,''), COALESCE(limite_credito,0), COALESCE(ultimo_pago_en,''), COALESCE(folio,0) FROM CLIENTES WHERE nombre LIKE ? OR telefono LIKE ? ORDER BY nombre`
+		if hasPage {
+			q += ` LIMIT ? OFFSET ?`
+			rows, err = db.Query(q, "%"+search+"%", "%"+search+"%", p.Limit, p.Offset)
+		} else {
+			rows, err = db.Query(q, "%"+search+"%", "%"+search+"%")
+		}
 	} else {
 		if hasPage {
 			db.QueryRow(`SELECT COUNT(*) FROM CLIENTES`).Scan(&total)
 		}
-		rows, err = db.Query(`SELECT numero, COALESCE(nombre,''), COALESCE(direccion,''), COALESCE(telefono,''), COALESCE(dsaldoactual,0), COALESCE(dtactualizasaldo,''), COALESCE(limite_credito,0), COALESCE(ultimo_pago_en,''), COALESCE(folio,0) FROM CLIENTES ORDER BY nombre`)
+		q := `SELECT numero, COALESCE(nombre,''), COALESCE(direccion,''), COALESCE(telefono,''), COALESCE(dsaldoactual,0), COALESCE(dtactualizasaldo,''), COALESCE(limite_credito,0), COALESCE(ultimo_pago_en,''), COALESCE(folio,0) FROM CLIENTES ORDER BY nombre`
+		if hasPage {
+			q += ` LIMIT ? OFFSET ?`
+			rows, err = db.Query(q, p.Limit, p.Offset)
+		} else {
+			rows, err = db.Query(q)
+		}
 	}
 	if err != nil {
 		jsonErr(w, err.Error(), 500)

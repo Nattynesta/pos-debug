@@ -101,11 +101,16 @@ func main() {
 	mux := http.NewServeMux()
 
 	staticSub, _ := fs.Sub(staticFS, "static")
-	localStatic := http.Dir("static")
+	exePath, _ := os.Executable()
+	staticDir := filepath.Join(filepath.Dir(exePath), "static")
+	localStatic := http.Dir(staticDir)
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "" || r.URL.Path == "/" {
 			http.NotFound(w, r)
 			return
+		}
+		if strings.HasPrefix(r.URL.Path, "img/") {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
 		}
 		f, err := localStatic.Open(r.URL.Path)
 		if err == nil {
@@ -282,7 +287,7 @@ func migrate(db *sql.DB) error {
 		db.Exec(`ALTER TABLE USUARIOS ADD COLUMN rol TEXT DEFAULT 'helper'`)
 	}
 
-	productoColumns := []string{"imagen_local", "marca", "categorias", "ingredientes", "nutriscore", "cantidad_presentacion", "nutricion", "off_image_url", "off_image_small"}
+	productoColumns := []string{"imagen_local", "imagen_thumb", "marca", "categorias", "ingredientes", "nutriscore", "cantidad_presentacion", "nutricion", "off_image_url", "off_image_small"}
 	for _, col := range productoColumns {
 		var hasCol int
 		db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('PRODUCTOS') WHERE name=?", col).Scan(&hasCol)
@@ -331,7 +336,7 @@ func migrate(db *sql.DB) error {
 	initSessionsTable(db)
 	initAuditTable(db)
 
-	createIndexes(db)
+	createPerformanceIndexes(db)
 
 	initJobsDB(db)
 
@@ -343,6 +348,8 @@ func migrate(db *sql.DB) error {
 	}
 	db.Exec("DELETE FROM productos_fts")
 	db.Exec(`INSERT INTO productos_fts (codigo, descripcion, categorias, marca) SELECT codigo, COALESCE(descripcion,''), COALESCE(categorias,''), COALESCE(p.marca,'') FROM PRODUCTOS p WHERE descripcion != '' OR codigo != ''`)
+
+	migrateThumbnails(db)
 
 	return nil
 }
@@ -377,6 +384,18 @@ func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 	return g.writer.Write(b)
 }
 
+func (g *gzipResponseWriter) WriteHeader(code int) {
+	g.ResponseWriter.Header().Del("Content-Length")
+	g.ResponseWriter.WriteHeader(code)
+}
+
+func (g *gzipResponseWriter) Flush() {
+	g.writer.Flush()
+	if flusher, ok := g.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 func withGzip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -387,7 +406,12 @@ func withGzip(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if r.Header.Get("Upgrade") == "websocket" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Vary", "Accept-Encoding")
 		gz, _ := gzip.NewWriterLevel(w, gzip.DefaultCompression)
 		defer gz.Close()
 		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, writer: gz}, r)
@@ -513,27 +537,64 @@ func parseFormFloat(r *http.Request, key string) (float64, error) {
 	return strconv.ParseFloat(r.FormValue(key), 64)
 }
 
-func createIndexes(db *sql.DB) {
+func createPerformanceIndexes(db *sql.DB) {
 	indexes := []string{
-		"CREATE INDEX IF NOT EXISTS idx_ventatickets_fecha ON VENTATICKETS(creado_en)",
+		"CREATE INDEX IF NOT EXISTS idx_ventatickets_creado ON VENTATICKETS(creado_en)",
 		"CREATE INDEX IF NOT EXISTS idx_ventatickets_cajero ON VENTATICKETS(cajero_id)",
 		"CREATE INDEX IF NOT EXISTS idx_ventatickets_cliente ON VENTATICKETS(cliente_id)",
 		"CREATE INDEX IF NOT EXISTS idx_ventatickets_estado ON VENTATICKETS(esta_abierto, esta_cancelado)",
+
 		"CREATE INDEX IF NOT EXISTS idx_ventas_ticket ON VENTAS(ticket_id)",
-		"CREATE INDEX IF NOT EXISTS idx_ventas_producto ON VENTAS(producto_id)",
+		"CREATE INDEX IF NOT EXISTS idx_ventas_producto ON VENTAS(producto_codigo)",
 		"CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON VENTAS(fecha)",
-		"CREATE INDEX IF NOT EXISTS idx_productos_categoria ON PRODUCTOS(categoria)",
+
+		"CREATE INDEX IF NOT EXISTS idx_productos_categoria ON PRODUCTOS(categorias)",
+		"CREATE INDEX IF NOT EXISTS idx_productos_codigo ON PRODUCTOS(codigo)",
 
 		"CREATE INDEX IF NOT EXISTS idx_clientes_telefono ON CLIENTES(telefono)",
+		"CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON CLIENTES(nombre)",
+
 		"CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id)",
 		"CREATE INDEX IF NOT EXISTS idx_audit_fecha ON audit_log(created_at)",
 		"CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action)",
+
 		"CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)",
 		"CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)",
+
+		"CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
+		"CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id)",
 	}
 	for _, idx := range indexes {
 		if _, err := db.Exec(idx); err != nil {
-			log.Printf("Error creating index: %v", err)
+			log.Printf("Error creando indice: %v", err)
 		}
+	}
+	log.Println("Indices de rendimiento creados correctamente")
+}
+
+func migrateThumbnails(db *sql.DB) {
+	rows, err := db.Query("SELECT codigo, imagen_local FROM PRODUCTOS WHERE imagen_local != '' AND (imagen_thumb IS NULL OR imagen_thumb = '')")
+	if err != nil {
+		log.Printf("Error buscando imagenes sin thumbnail: %v", err)
+		return
+	}
+	defer rows.Close()
+	var count int
+	for rows.Next() {
+		var codigo, imgLocal string
+		rows.Scan(&codigo, &imgLocal)
+		ext := filepath.Ext(imgLocal)
+		srcPath := filepath.Join("static", "img", "productos", codigo+ext)
+		dstPath := filepath.Join("static", "img", "productos", "thumbs", codigo+ext)
+		if err := createThumbnail(srcPath, dstPath); err != nil {
+			log.Printf("Error thumbnail %s: %v", codigo, err)
+			continue
+		}
+		thumbURL := "/static/img/productos/thumbs/" + codigo + ext
+		db.Exec("UPDATE PRODUCTOS SET imagen_thumb=? WHERE codigo=?", thumbURL, codigo)
+		count++
+	}
+	if count > 0 {
+		log.Printf("Thumbnails generados: %d", count)
 	}
 }

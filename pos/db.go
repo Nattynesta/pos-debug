@@ -26,6 +26,7 @@ type Producto struct {
 	Componentes         string  `json:"componentes"`
 	Impuestos           string  `json:"impuestos"`
 	ImagenLocal         string  `json:"imagen_local,omitempty"`
+	ImagenThumb         string  `json:"imagen_thumb,omitempty"`
 	Marca               string  `json:"marca,omitempty"`
 	Categorias          string  `json:"categorias,omitempty"`
 	Ingredientes        string  `json:"ingredientes,omitempty"`

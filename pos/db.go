@@ -33,10 +33,6 @@ type Producto struct {
 	Nutriscore          string  `json:"nutriscore,omitempty"`
 	CantidadPresentacion string `json:"cantidad_presentacion,omitempty"`
 	Nutricion           string  `json:"nutricion,omitempty"`
-	OffImageUrl         string  `json:"off_image_url,omitempty"`
-	OffImageSmall       string  `json:"off_image_small,omitempty"`
-	OffImageGrande      string  `json:"off_image_grande,omitempty"`
-	OffName             string  `json:"off_name,omitempty"`
 }
 
 type Cliente struct {
@@ -308,18 +304,9 @@ func listProductos() ([]Producto, error) {
 			COALESCE(p.dinventario,0), COALESCE(p.dinvminimo,0), COALESCE(p.dinvmaximo,0), 
 			COALESCE(p.checado_en,''), COALESCE(p.porcentaje_ganancia,0), COALESCE(p.componentes,''), COALESCE(p.impuestos,''),
 			COALESCE(p.imagen_local,''),
-			COALESCE(p.marca, o.marca),
-			COALESCE(p.categorias, o.categorias),
-			COALESCE(p.ingredientes, o.ingredientes),
-			COALESCE(p.nutriscore, o.nutriscore),
-			COALESCE(p.cantidad_presentacion, o.cantidad_presentacion),
-			COALESCE(p.nutricion, o.nutricion),
-			COALESCE(p.off_image_url, o.imagen_url),
-			COALESCE(p.off_image_small, o.imagen_small),
-			COALESCE(o.imagen_grande, ''),
-			COALESCE(o.nombre, '')
+			COALESCE(p.marca,''), COALESCE(p.categorias,''), COALESCE(p.ingredientes,''),
+			COALESCE(p.nutriscore,''), COALESCE(p.cantidad_presentacion,''), COALESCE(p.nutricion,'')
 		FROM PRODUCTOS p
-		LEFT JOIN productos_openfoods o ON p.codigo = o.codigo
 		ORDER BY p.descripcion`)
 	if err != nil {
 		return nil, err
@@ -329,7 +316,7 @@ func listProductos() ([]Producto, error) {
 	ps := make([]Producto, 0)
 	for rows.Next() {
 		var p Producto
-		rows.Scan(&p.Codigo, &p.Descripcion, &p.Tventa, &p.Pcosto, &p.Pventa, &p.Dept, &p.Provid, &p.Umedida, &p.Mayoreo, &p.Iprioridad, &p.Dinventario, &p.Dinvminimo, &p.Dinvmaximo, &p.ChecadoEn, &p.PorcentajeGanancia, &p.Componentes, &p.Impuestos, &p.ImagenLocal, &p.Marca, &p.Categorias, &p.Ingredientes, &p.Nutriscore, &p.CantidadPresentacion, &p.Nutricion, &p.OffImageUrl, &p.OffImageSmall, &p.OffImageGrande, &p.OffName)
+		rows.Scan(&p.Codigo, &p.Descripcion, &p.Tventa, &p.Pcosto, &p.Pventa, &p.Dept, &p.Provid, &p.Umedida, &p.Mayoreo, &p.Iprioridad, &p.Dinventario, &p.Dinvminimo, &p.Dinvmaximo, &p.ChecadoEn, &p.PorcentajeGanancia, &p.Componentes, &p.Impuestos, &p.ImagenLocal, &p.Marca, &p.Categorias, &p.Ingredientes, &p.Nutriscore, &p.CantidadPresentacion, &p.Nutricion)
 		ps = append(ps, p)
 	}
 	return ps, nil

@@ -76,17 +76,7 @@
                 <img id="preview-img" style="max-width:200px; max-height:200px; border-radius:8px; border:1px solid #e5e7eb;">
             </div>
         </div>
-        <details style="margin-top:1rem;">
-            <summary style="cursor:pointer; font-weight:500; color:#1e3a5f;">Datos OpenFoods (opcional)</summary>
-            <div style="margin-top:.5rem; display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
-                <div class="form-group"><label>Marca</label><input type="text" id="marca"></div>
-                <div class="form-group"><label>Categorías</label><input type="text" id="categorias" placeholder="ej: Bebidas,Refrescos"></div>
-                <div class="form-group"><label>Ingredientes</label><textarea id="ingredientes" rows="2" style="font-size:.85rem;"></textarea></div>
-                <div class="form-group"><label>Nutrición (JSON)</label><textarea id="nutricion" rows="2" style="font-size:.85rem;" placeholder='{"energy-kcal":200,"sugars":10,"fat":5}'></textarea></div>
-                <div class="form-group"><label>NutriScore</label><select id="nutriscore"><option value="">--</option><option value="a">A</option><option value="b">B</option><option value="c">C</option><option value="d">D</option><option value="e">E</option></select></div>
-                <div class="form-group"><label>Presentación</label><input type="text" id="cantidad_presentacion" placeholder="ej: 350 ml"></div>
-            </div>
-        </details>
+
         <div class="flex mt-1">
             <button type="submit" class="btn btn-primary">Guardar</button>
             <a href="/productos" class="btn btn-outline">Cancelar</a>
@@ -123,12 +113,6 @@ var codigoEdit = document.getElementById('codigo_original').value;
         if(p.umedida) document.getElementById('umedida').value = p.umedida;
         if(p.provid) document.getElementById('provid').value = p.provid;
         document.getElementById('impuestos').value = p.impuestos;
-        document.getElementById('marca').value = p.marca || '';
-        document.getElementById('categorias').value = p.categorias || '';
-        document.getElementById('ingredientes').value = p.ingredientes || '';
-        document.getElementById('nutricion').value = p.nutricion || '';
-        document.getElementById('nutriscore').value = p.nutriscore || '';
-        document.getElementById('cantidad_presentacion').value = p.cantidad_presentacion || '';
         if(p.imagen_local){
             document.getElementById('preview-img').src = p.imagen_local;
             document.getElementById('imagen-preview').style.display = 'block';
@@ -166,13 +150,7 @@ function saveProducto(e){
         dinventario: parseFloat(document.getElementById('dinventario').value)||0,
         dinvminimo: parseFloat(document.getElementById('dinvminimo').value)||0,
         impuestos: document.getElementById('impuestos').value,
-        imagen_local: document.getElementById('imagen_local').files[0] ? '' : undefined,
-        marca: document.getElementById('marca').value || '',
-        categorias: document.getElementById('categorias').value || '',
-        ingredientes: document.getElementById('ingredientes').value || '',
-        nutricion: document.getElementById('nutricion').value || '',
-        nutriscore: document.getElementById('nutriscore').value || '',
-        cantidad_presentacion: document.getElementById('cantidad_presentacion').value || ''
+        imagen_local: document.getElementById('imagen_local').files[0] ? '' : undefined
     };
     var url = isEdit ? '/api/productos/'+encodeURIComponent(codigoEdit) : '/api/productos';
     var method = isEdit ? 'PUT' : 'POST';

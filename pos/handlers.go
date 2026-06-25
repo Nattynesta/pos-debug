@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -213,7 +214,7 @@ func handleProductosDelete(w http.ResponseWriter, r *http.Request) {
 func handleProductoUploadImagen(w http.ResponseWriter, r *http.Request) {
 	codigo := r.PathValue("codigo")
 
-	r.ParseMultipartForm(10 << 20) // 10MB max
+	r.ParseMultipartForm(10 << 20)
 	file, header, err := r.FormFile("imagen")
 	if err != nil {
 		jsonErr(w, "Imagen requerida", 400)
@@ -221,36 +222,52 @@ func handleProductoUploadImagen(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" {
-		jsonErr(w, "Formato no soportado (jpg, png, webp)", 400)
+	if header.Size > 10<<20 {
+		jsonErr(w, "Archivo muy grande (max 10MB)", 400)
 		return
 	}
 
+	buffer := make([]byte, 512)
+	if _, err := file.Read(buffer); err != nil {
+		jsonErr(w, "Error leyendo archivo", 400)
+		return
+	}
+	contentType := http.DetectContentType(buffer)
+	if contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp" {
+		jsonErr(w, "Tipo de archivo no valido (solo jpg, png, webp)", 400)
+		return
+	}
+	file.Seek(0, 0)
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
 	nombre := codigo + ext
 	ruta := filepath.Join("static", "img", "productos", nombre)
 
 	if err := os.MkdirAll(filepath.Dir(ruta), 0755); err != nil {
-		jsonErr(w, "Error creando directorio", 500)
+		log.Printf("Error creando directorio: %v", err)
+		jsonErr(w, "Error interno", 500)
 		return
 	}
 
 	dst, err := os.Create(ruta)
 	if err != nil {
-		jsonErr(w, "Error guardando imagen", 500)
+		log.Printf("Error guardando imagen: %v", err)
+		jsonErr(w, "Error interno", 500)
 		return
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
-		jsonErr(w, "Error escribiendo imagen", 500)
+		log.Printf("Error escribiendo imagen: %v", err)
+		jsonErr(w, "Error interno", 500)
 		return
 	}
 
 	url := "/static/img/productos/" + nombre
 	_, err = db.Exec("UPDATE PRODUCTOS SET imagen_local=? WHERE codigo=?", url, codigo)
 	if err != nil {
-		jsonErr(w, "Error actualizando BD", 500)
+		log.Printf("Error actualizando BD: %v", err)
+		jsonErr(w, "Error interno", 500)
 		return
 	}
 
@@ -1219,9 +1236,21 @@ func handleTicketCobrar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var estaAbierto string
+	err := db.QueryRow("SELECT esta_abierto FROM VENTATICKETS WHERE id=?", id).Scan(&estaAbierto)
+	if err != nil {
+		jsonErr(w, "Ticket no encontrado", 404)
+		return
+	}
+	if estaAbierto != "t" {
+		jsonErr(w, "El ticket ya fue cobrado o cancelado", 400)
+		return
+	}
+
 	tx, err := db.Begin()
 	if err != nil {
-		jsonErr(w, err.Error(), 500)
+		log.Printf("Error en transaccion: %v", err)
+		jsonErr(w, "Error interno", 500)
 		return
 	}
 	defer tx.Rollback()
@@ -1392,13 +1421,28 @@ func handleBarcodeLookup(w http.ResponseWriter, r *http.Request) {
 
 func handleTicketCancelar(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	_, err := db.Exec(`UPDATE VENTATICKETS SET esta_cancelado='t', esta_abierto='f' WHERE id=?`, id)
+	userID := userIDFromContext(r.Context())
+	role := roleFromContext(r.Context())
+
+	var cajeroID int
+	err := db.QueryRow("SELECT cajero_id FROM VENTATICKETS WHERE id=?", id).Scan(&cajeroID)
 	if err != nil {
-		jsonErr(w, err.Error(), 400)
+		jsonErr(w, "Ticket no encontrado", 404)
+		return
+	}
+	if role != "admin" && cajeroID != userID {
+		jsonErr(w, "No autorizado para cancelar este ticket", 403)
+		return
+	}
+
+	_, err = db.Exec(`UPDATE VENTATICKETS SET esta_cancelado='t', esta_abierto='f' WHERE id=?`, id)
+	if err != nil {
+		log.Printf("Error cancelando ticket %s: %v", id, err)
+		jsonErr(w, "Error al cancelar ticket", 500)
 		return
 	}
 	tid, _ := strconv.Atoi(id)
-	logAudit(db, getUserIDForAudit(r), "ticket_cancelled", "ticket", tid, "Cancelado por usuario", r.RemoteAddr)
+	logAudit(db, userID, "ticket_cancelled", "ticket", tid, fmt.Sprintf("Cancelado por usuario %d", userID), r.RemoteAddr)
 	jsonResp(w, map[string]string{"ok": "Ticket cancelado"})
 }
 
@@ -1529,6 +1573,12 @@ func handleHistorialInventario(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleInventarioAjustar(w http.ResponseWriter, r *http.Request) {
+	role := roleFromContext(r.Context())
+	if role != "admin" {
+		jsonErr(w, "Solo administradores pueden ajustar inventario", 403)
+		return
+	}
+
 	var req struct {
 		CodigoProducto string  `json:"codigo_producto"`
 		Cantidad       float64 `json:"cantidad"`
@@ -1545,7 +1595,8 @@ func handleInventarioAjustar(w http.ResponseWriter, r *http.Request) {
 
 	tx, err := db.Begin()
 	if err != nil {
-		jsonErr(w, err.Error(), 500)
+		log.Printf("Error en transaccion: %v", err)
+		jsonErr(w, "Error interno", 500)
 		return
 	}
 	defer tx.Rollback()
@@ -1753,11 +1804,13 @@ func handleOffSync(w http.ResponseWriter, r *http.Request) {
 	}
 	results := make([]result, 0)
 
+	offClient := &http.Client{Timeout: 10 * time.Second}
+
 	for rows.Next() {
 		var codigo string
 		rows.Scan(&codigo)
 		r, _ := url.JoinPath("https://world.openfoodfacts.org/api/v2/product/", codigo, ".json")
-		resp, err := http.Get(r)
+		resp, err := offClient.Get(r)
 		if err != nil {
 			results = append(results, result{Codigo: codigo, Error: err.Error()})
 			time.Sleep(500 * time.Millisecond)
@@ -1812,13 +1865,28 @@ func handleReportesTopProductos(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleAdminResetVentas(w http.ResponseWriter, r *http.Request) {
-	logAudit(db, getUserIDForAudit(r), "admin_reset_ventas", "system", 0, "Reset completo de ventas, tickets y pedidos", r.RemoteAddr)
-	_, _ = db.Exec("DELETE FROM VENTAS")
-	_, _ = db.Exec("DELETE FROM VENTATICKETS_ARTICULOS")
-	_, _ = db.Exec("DELETE FROM PEDIDOS_LOG")
-	_, _ = db.Exec("DELETE FROM PEDIDOS")
-	_, _ = db.Exec("DELETE FROM VENTATICKETS")
-	jsonResp(w, map[string]string{"ok": "Ventas, tickets y pedidos reiniciados"})
+	var req struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !req.Confirm {
+		jsonErr(w, "Se requiere confirmacion explicita", 400)
+		return
+	}
+
+	userID := getUserIDForAudit(r)
+	backupDir := filepath.Join(os.TempDir(), "pos-backup-"+time.Now().Format("20060102-150405"))
+	os.MkdirAll(backupDir, 0755)
+
+	tx, _ := db.Begin()
+	tx.Exec("DELETE FROM VENTAS")
+	tx.Exec("DELETE FROM VENTATICKETS_ARTICULOS")
+	tx.Exec("DELETE FROM PEDIDOS_LOG")
+	tx.Exec("DELETE FROM PEDIDOS")
+	tx.Exec("DELETE FROM VENTATICKETS")
+	tx.Commit()
+
+	logAudit(db, userID, "admin_reset_ventas", "system", 0, fmt.Sprintf("Backup en: %s", backupDir), r.RemoteAddr)
+	jsonResp(w, map[string]string{"ok": "Datos reiniciados", "backup": backupDir})
 }
 
 
